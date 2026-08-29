@@ -1,0 +1,4 @@
+[
+  {"device_id": "dev-100", "location_id": "loc-100", "device_type": "sensor", "device_status": "active", "updated_at": "2025-02-01T08:00:00Z"},
+  {"device_id": "dev-200", "location_id": "loc-200", "device_type": "gateway", "device_status": "inactive", "updated_at": "2025-02-01T08:00:00Z"}
+]
