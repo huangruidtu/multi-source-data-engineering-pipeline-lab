@@ -118,5 +118,5 @@ The following contract-only walkthrough is the MDEP-6 validation baseline. It do
 ## Open implementation decisions
 
 - Exact field names/types for the physical PostgreSQL tables and individual REST/file payloads are finalized in MDEP-7, but must conform to these logical contracts.
-- Watermark duration, allowed lateness, and delete representation are operational decisions for MDEP-11/MDEP-6 integration work and must not be silently chosen by batch jobs.
+- Watermark duration, allowed lateness, and delete representation are operational decisions for MDEP-11 (Flink streaming implementation) and must not be silently chosen by batch jobs.
 - The shared Iceberg catalog and Snowflake access decision is recorded in [ADR-0001](../../docs/decisions/0001-iceberg-catalog-and-snowflake-access.md).
