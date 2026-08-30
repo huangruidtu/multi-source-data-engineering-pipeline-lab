@@ -13,7 +13,8 @@ class Mdep60FinalizationTests(unittest.TestCase):
             'key-design-decisions.md', 'data-model-and-grain.md',
             'failure-and-recovery-reasoning.md', 'offline-validation-coverage.md',
             'production-gap-analysis.md', 'code-reading-guide.md',
-            'learning-guide.md', 'interview-qa.md',
+            'learning-guide.md', 'interview-qa.md', 'README.md',
+            'interview-cheat-sheet.md',
         ):
             self.assertTrue((finalization / name).is_file(), name)
         architecture = (finalization / 'architecture-implementation-mapping.md').read_text(encoding='utf-8')

@@ -83,8 +83,10 @@ remaining V1.x runtime work and never treats it as a failed V1 implementation.
 
 ## Learning and interview preparation
 
+- [Finalization Documentation Index](docs/finalization/README.md)
 - [Final Learning Guide](docs/finalization/learning-guide.md)
 - [Project-specific Interview Q&A](docs/finalization/interview-qa.md)
+- [Interview Cheat Sheet](docs/finalization/interview-cheat-sheet.md)
 - [Code Reading Guide](docs/finalization/code-reading-guide.md)
 - [Failure and Recovery Reasoning](docs/finalization/failure-and-recovery-reasoning.md)
 - [Production Gap Analysis](docs/finalization/production-gap-analysis.md)
