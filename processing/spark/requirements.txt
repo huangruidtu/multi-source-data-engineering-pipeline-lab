@@ -1,0 +1,2 @@
+# The Iceberg runtime is supplied to spark-submit with --packages (see runbook).
+pyspark>=3.5,<3.6
