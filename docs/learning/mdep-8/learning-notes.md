@@ -9,3 +9,4 @@
 - **Metadata and lineage:** locator, source version, hash, and interval identity let a reviewer trace a Bronze row to its source request/file/table and landing operation.
 - **Quarantine:** malformed JSON and missing/duplicate/invalid fixtures become evidence records. Parsing success is not business validity; future Silver owns deeper validation.
 - **Partial failure/replay:** REST records are collected before publishing, so a mid-page failure leaves no partial canonical object. The next task attempt can replay deterministically.
+- **Validation debt:** static tests and local Parquet evidence validate code paths, not Airflow scheduler behavior, container networking, PostgreSQL connectivity, or cloud credentials. This Story remains in progress until the runtime checklist is executed and evidenced.

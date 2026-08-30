@@ -23,3 +23,7 @@
 **English:** “Batch PostgreSQL output is evidence and recovery material in Bronze, not the Silver current-state owner. I learned that source alignment includes schema boundaries: valid CSV and JSON must not be forced into one inferred schema. In production I would add durable REST checkpoints, Airflow connections/secrets, schema contracts, S3 encryption and lifecycle rules, race-safe manifests, observability, and execute the currently unvalidated Airflow/PostgreSQL/S3 scenarios.”
 
 **中文：**“PostgreSQL 批处理只在 Bronze 中保存证据和恢复材料，不拥有 Silver 当前状态。我学到 source-aligned 也包括 schema 边界。生产环境会增加持久检查点、密钥、契约、S3 加密生命周期、并发保护、可观测性，并完成未验证的运行场景。”
+
+**English:** “I would be explicit in an interview that the code was merged with runtime validation debt. I can explain the locally validated behavior, but I would not say the Airflow or PostgreSQL path ran until I have logs and inspected output from a Docker-capable environment.”
+
+**中文：**“面试中我会明确说明：代码虽然已合并，但仍有运行时验证债务。我只会陈述已在本地验证的行为；在 Docker 环境拿到日志和输出前，不会声称 Airflow 或 PostgreSQL 路径已经运行。”
