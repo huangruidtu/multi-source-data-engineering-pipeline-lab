@@ -24,6 +24,9 @@ class CdcEvent:
     after: dict[str, Any] | None
     source_lsn: int
     source_tx_id: str | None
+    transaction_id: str | None
+    transaction_total_order: int | None
+    transaction_data_collection_order: int | None
     source_event_ts: str | None
     kafka_topic: str
     kafka_partition: int | None
@@ -35,8 +38,9 @@ class CdcEvent:
 class VersionDecision(str, Enum):
     NEWER = "newer"
     LOWER_LSN = "lower_lsn"
+    LOWER_TRANSACTION_ORDER = "lower_transaction_order"
     EXACT_REPLAY = "exact_replay"
-    EQUAL_LSN_TRANSPORT_CONFLICT = "equal_lsn_transport_conflict"
+    EQUAL_POSITION_CONFLICT = "equal_position_conflict"
 
 
 def parse_lsn(value: str | int) -> int:
@@ -60,6 +64,15 @@ def _primary_from_payload(entity: str, key: dict[str, Any] | None, before: dict[
     raise ValueError(f"missing {primary_field} in Kafka key, before, and after")
 
 
+def _optional_order(value: Any, field: str) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"invalid Debezium transaction.{field}") from error
+
+
 def parse_debezium(key_json: str | None, value_json: str | None, topic: str, partition: int | None, offset: int | None) -> CdcEvent | None:
     """Normalize a Debezium JSON value; ``None`` is a Kafka tombstone.
 
@@ -75,7 +88,7 @@ def parse_debezium(key_json: str | None, value_json: str | None, topic: str, par
     entity = topic.rsplit(".", 1)[-1]
     if entity not in CDC_ENTITIES:
         raise ValueError("CDC entity is outside Flink ownership")
-    op, source = payload.get("op"), payload.get("source") or {}
+    op, source, transaction = payload.get("op"), payload.get("source") or {}, payload.get("transaction") or {}
     before, after = payload.get("before"), payload.get("after")
     if op not in {"r", "c", "u", "d"}:
         raise ValueError("unsupported Debezium operation")
@@ -86,19 +99,42 @@ def parse_debezium(key_json: str | None, value_json: str | None, topic: str, par
     return CdcEvent(
         entity, _primary_from_payload(entity, key, before, after), op, before, after,
         parse_lsn(source["lsn"]), str(source.get("txId")) if source.get("txId") is not None else None,
+        str(transaction.get("id")) if transaction.get("id") is not None else None,
+        _optional_order(transaction.get("total_order"), "total_order"),
+        _optional_order(transaction.get("data_collection_order"), "data_collection_order"),
         source.get("ts_ms"), topic, partition, offset, source.get("snapshot") in {True, "true", "last"}, value_json,
     )
 
 
+def _same_known_transport(event: CdcEvent, last: CdcEvent) -> bool:
+    """Identity is available only when both partition and offset are present."""
+    return (
+        event.kafka_partition is not None and event.kafka_offset is not None
+        and last.kafka_partition is not None and last.kafka_offset is not None
+        and (event.kafka_topic, event.kafka_partition, event.kafka_offset)
+        == (last.kafka_topic, last.kafka_partition, last.kafka_offset)
+    )
+
+
 def version_decision(event: CdcEvent, last: CdcEvent | None) -> VersionDecision:
-    """Compare one database key without treating partition number as freshness."""
+    """Order one source key by LSN, then Debezium transaction order, then identity.
+
+    Kafka partition numbers are never compared numerically. A missing transport
+    coordinate cannot prove that two messages are the same replay.
+    """
     if last is None or event.source_lsn > last.source_lsn:
         return VersionDecision.NEWER
     if event.source_lsn < last.source_lsn:
         return VersionDecision.LOWER_LSN
-    if (event.kafka_topic, event.kafka_partition, event.kafka_offset) == (last.kafka_topic, last.kafka_partition, last.kafka_offset):
+    same_transaction = event.transaction_id is not None and event.transaction_id == last.transaction_id
+    if same_transaction and event.transaction_total_order is not None and last.transaction_total_order is not None:
+        if event.transaction_total_order > last.transaction_total_order:
+            return VersionDecision.NEWER
+        if event.transaction_total_order < last.transaction_total_order:
+            return VersionDecision.LOWER_TRANSACTION_ORDER
+    if _same_known_transport(event, last):
         return VersionDecision.EXACT_REPLAY
-    return VersionDecision.EQUAL_LSN_TRANSPORT_CONFLICT
+    return VersionDecision.EQUAL_POSITION_CONFLICT
 
 
 def is_newer(event: CdcEvent, last: CdcEvent | None) -> bool:

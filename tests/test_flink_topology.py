@@ -19,7 +19,7 @@ class FlinkTopologyTests(unittest.TestCase):
         self.assertEqual(4, len(TOPICS))
         self.assertEqual("earliest", spec["starting_offsets"])
         self.assertIn("ValueState", spec["keyed_state"])
-        self.assertIn("source_lsn only", spec["cdc_order"])
+        self.assertIn("same-transaction Debezium total_order", spec["cdc_order"])
 
     def test_job_source_contains_real_wiring_not_a_runtime_stub(self):
         job = Path("processing/flink/flink_cdc_job.py").read_text(encoding="utf-8")
@@ -41,6 +41,7 @@ class FlinkTopologyTests(unittest.TestCase):
         for ddl in ddls.values():
             self.assertIn("catalog", ddl.lower()) if False else self.assertIn("PRIMARY KEY", ddl)
             self.assertIn("write.upsert.enabled", ddl)
+            self.assertIn("transaction_total_order BIGINT", ddl)
 
 
 if __name__ == "__main__":

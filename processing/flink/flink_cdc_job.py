@@ -18,9 +18,9 @@ CONSUMER_GROUP = "mdep-flink-cdc-silver-v1"
 BRONZE_LAYOUT = "bronze/cdc/<entity>/event_date=YYYY-MM-DD/"
 QUARANTINE_LAYOUT = "quarantine/cdc/<entity>/event_date=YYYY-MM-DD/"
 SILVER_TABLES = ["mdep.silver.core_customers", "mdep.silver.core_products", "mdep.silver.core_orders", "mdep.silver.core_payments"]
-BRONZE_FIELDS = ["entity", "primary_key", "op", "source_lsn", "source_tx_id", "source_event_ts", "kafka_topic", "kafka_partition", "kafka_offset", "snapshot", "original_envelope", "processed_at", "event_date"]
+BRONZE_FIELDS = ["entity", "primary_key", "op", "source_lsn", "source_tx_id", "transaction_id", "transaction_total_order", "transaction_data_collection_order", "source_event_ts", "kafka_topic", "kafka_partition", "kafka_offset", "snapshot", "original_envelope", "processed_at", "event_date"]
 QUARANTINE_FIELDS = ["entity", "kafka_topic", "kafka_partition", "kafka_offset", "original_payload", "rejection_reason", "processed_at", "event_date"]
-SILVER_FIELDS = ["entity", "customer_id", "customer_name", "email", "customer_status", "created_at", "preferred_language", "product_id", "product_name", "category_code", "unit_price", "order_id", "order_status", "order_ts", "order_total", "payment_id", "payment_status", "payment_ts", "amount", "currency", "authorization_code", "source_lsn", "source_tx_id", "source_event_ts", "kafka_topic", "kafka_partition", "kafka_offset", "applied_at"]
+SILVER_FIELDS = ["entity", "customer_id", "customer_name", "email", "customer_status", "created_at", "preferred_language", "product_id", "product_name", "category_code", "unit_price", "order_id", "order_status", "order_ts", "order_total", "payment_id", "payment_status", "payment_ts", "amount", "currency", "authorization_code", "source_lsn", "source_tx_id", "transaction_id", "transaction_total_order", "transaction_data_collection_order", "source_event_ts", "kafka_topic", "kafka_partition", "kafka_offset", "applied_at"]
 
 
 def topology_spec() -> dict:
@@ -30,13 +30,13 @@ def topology_spec() -> dict:
         "checkpoint_min_pause_ms": CHECKPOINT_MIN_PAUSE_MS, "bronze_layout": BRONZE_LAYOUT,
         "quarantine_layout": QUARANTINE_LAYOUT, "silver_tables": SILVER_TABLES,
         "keyed_state": "ValueState(last version) and ValueState(current row), keyed by entity:primary_key",
-        "cdc_order": "source_lsn only; equal-LSN transport coordinates identify an exact replay but never make another partition newer",
+        "cdc_order": "source_lsn, then same-transaction Debezium total_order, then known transport identity; Kafka partition number is never freshness",
         "watermark": f"source event timestamp with {WATERMARK_SECONDS}s bounded out-of-orderness; never used for CDC state acceptance",
     }
 
 
 def silver_table_ddls() -> dict[str, str]:
-    metadata = "source_lsn BIGINT NOT NULL, source_tx_id STRING, source_event_ts STRING, kafka_topic STRING NOT NULL, kafka_partition INT, kafka_offset BIGINT, applied_at STRING NOT NULL"
+    metadata = "source_lsn BIGINT NOT NULL, source_tx_id STRING, transaction_id STRING, transaction_total_order BIGINT, transaction_data_collection_order BIGINT, source_event_ts STRING, kafka_topic STRING NOT NULL, kafka_partition INT, kafka_offset BIGINT, applied_at STRING NOT NULL"
     options = "'format-version'='2', 'write.upsert.enabled'='true', 'write.format.default'='parquet'"
     return {
         "customers": f"CREATE TABLE IF NOT EXISTS mdep.silver.core_customers (customer_id STRING NOT NULL, customer_name STRING, email STRING, customer_status STRING, created_at STRING, updated_at STRING, preferred_language STRING, {metadata}, PRIMARY KEY (customer_id) NOT ENFORCED) WITH ({options})",
@@ -65,11 +65,11 @@ def _bronze_values(raw: str) -> list:
     try:
         event = parse_debezium(None, payload, message["topic"], None, None)
         if event is None:
-            return [entity, None, "tombstone", None, None, None, message["topic"], None, None, None, None, processed_at, _event_date(processed_at)]
-        return [event.entity, event.primary_key, event.operation, event.source_lsn, event.source_tx_id, event.source_event_ts, event.kafka_topic, event.kafka_partition, event.kafka_offset, str(event.snapshot).lower(), event.envelope, processed_at, _event_date(processed_at)]
+            return [entity, None, "tombstone", None, None, None, None, None, message["topic"], None, None, None, None, None, processed_at, _event_date(processed_at)]
+        return [event.entity, event.primary_key, event.operation, event.source_lsn, event.source_tx_id, event.transaction_id, event.transaction_total_order, event.transaction_data_collection_order, event.source_event_ts, event.kafka_topic, event.kafka_partition, event.kafka_offset, str(event.snapshot).lower(), event.envelope, processed_at, _event_date(processed_at)]
     except (ValueError, json.JSONDecodeError):
         # Bronze is evidence-first: malformed bytes are archived as unparsed input.
-        return [entity, None, "unparsed", None, None, None, message["topic"], None, None, None, payload, processed_at, _event_date(processed_at)]
+        return [entity, None, "unparsed", None, None, None, None, None, message["topic"], None, None, None, None, payload, processed_at, _event_date(processed_at)]
 
 
 def _quarantine_value(raw: str, reason: str) -> str:
@@ -89,7 +89,7 @@ def _to_silver_row(event, row_kind, row_class):
         "product_id": after.get("product_id") or (event.primary_key if event.entity == "products" else None), "product_name": after.get("product_name"), "category_code": after.get("category_code"), "unit_price": str(after.get("unit_price")) if after.get("unit_price") is not None else None,
         "order_id": after.get("order_id") or (event.primary_key if event.entity == "orders" else None), "order_status": after.get("order_status"), "order_ts": after.get("order_ts"), "order_total": str(after.get("order_total")) if after.get("order_total") is not None else None,
         "payment_id": after.get("payment_id") or (event.primary_key if event.entity == "payments" else None), "payment_status": after.get("payment_status"), "payment_ts": after.get("payment_ts"), "amount": str(after.get("amount")) if after.get("amount") is not None else None, "currency": after.get("currency"), "authorization_code": after.get("authorization_code"),
-        "source_lsn": event.source_lsn, "source_tx_id": event.source_tx_id, "source_event_ts": event.source_event_ts, "kafka_topic": event.kafka_topic, "kafka_partition": event.kafka_partition, "kafka_offset": event.kafka_offset, "applied_at": _utc_now(),
+        "source_lsn": event.source_lsn, "source_tx_id": event.source_tx_id, "transaction_id": event.transaction_id, "transaction_total_order": event.transaction_total_order, "transaction_data_collection_order": event.transaction_data_collection_order, "source_event_ts": event.source_event_ts, "kafka_topic": event.kafka_topic, "kafka_partition": event.kafka_partition, "kafka_offset": event.kafka_offset, "applied_at": _utc_now(),
     }
     row = row_class(*[values[field] for field in SILVER_FIELDS])
     row.set_row_kind(row_kind)
@@ -183,24 +183,24 @@ def run() -> None:
     for source in inputs[1:]:
         raw = raw.union(source)
 
-    bronze_type = Types.ROW_NAMED(BRONZE_FIELDS, [Types.STRING(), Types.STRING(), Types.STRING(), Types.LONG(), Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(), Types.LONG(), Types.STRING(), Types.STRING(), Types.STRING(), Types.STRING()])
+    bronze_type = Types.ROW_NAMED(BRONZE_FIELDS, [Types.STRING(), Types.STRING(), Types.STRING(), Types.LONG(), Types.STRING(), Types.STRING(), Types.LONG(), Types.LONG(), Types.STRING(), Types.STRING(), Types.INT(), Types.LONG(), Types.STRING(), Types.STRING(), Types.STRING(), Types.STRING()])
     bronze = raw.map(lambda value: Row(*_bronze_values(value)), output_type=bronze_type)
     parsed = raw.process(DebeziumParser(), output_type=Types.STRING())
     quarantine_type = Types.ROW_NAMED(QUARANTINE_FIELDS, [Types.STRING(), Types.STRING(), Types.INT(), Types.LONG(), Types.STRING(), Types.STRING(), Types.STRING(), Types.STRING()])
     quarantine = parsed.get_side_output(quarantine_tag).map(lambda value: Row(*_quarantine_values(value)), output_type=quarantine_type)
     event_time = parsed.assign_timestamps_and_watermarks(WatermarkStrategy.for_bounded_out_of_orderness(Duration.of_seconds(WATERMARK_SECONDS)).with_timestamp_assigner(SourceEventTimestampAssigner()))
-    silver_type = Types.ROW_NAMED(SILVER_FIELDS, [Types.STRING()] * 21 + [Types.LONG(), Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(), Types.LONG(), Types.STRING()])
+    silver_type = Types.ROW_NAMED(SILVER_FIELDS, [Types.STRING()] * 21 + [Types.LONG(), Types.STRING(), Types.STRING(), Types.LONG(), Types.LONG(), Types.STRING(), Types.STRING(), Types.INT(), Types.LONG(), Types.STRING()])
     silver = event_time.key_by(lambda value: key_identity(event_from_json(value)), key_type=Types.STRING()).process(CdcStateApplier(), output_type=silver_type)
 
     bronze_schema = Schema.new_builder()
     for field in BRONZE_FIELDS:
-        bronze_schema.column(field, DataTypes.BIGINT() if field in {"source_lsn", "kafka_offset"} else DataTypes.INT() if field == "kafka_partition" else DataTypes.STRING())
+        bronze_schema.column(field, DataTypes.BIGINT() if field in {"source_lsn", "transaction_total_order", "transaction_data_collection_order", "kafka_offset"} else DataTypes.INT() if field == "kafka_partition" else DataTypes.STRING())
     quarantine_schema = Schema.new_builder()
     for field in QUARANTINE_FIELDS:
         quarantine_schema.column(field, DataTypes.BIGINT() if field == "kafka_offset" else DataTypes.INT() if field == "kafka_partition" else DataTypes.STRING())
     silver_schema = Schema.new_builder()
     for field in SILVER_FIELDS:
-        silver_schema.column(field, DataTypes.BIGINT() if field in {"source_lsn", "kafka_offset"} else DataTypes.INT() if field == "kafka_partition" else DataTypes.STRING())
+        silver_schema.column(field, DataTypes.BIGINT() if field in {"source_lsn", "transaction_total_order", "transaction_data_collection_order", "kafka_offset"} else DataTypes.INT() if field == "kafka_partition" else DataTypes.STRING())
     table_env.create_temporary_view("bronze_cdc_input", table_env.from_data_stream(bronze, bronze_schema.build()))
     table_env.create_temporary_view("quarantine_cdc_input", table_env.from_data_stream(quarantine, quarantine_schema.build()))
     table_env.create_temporary_view("silver_cdc_changelog", table_env.from_changelog_stream(silver, silver_schema.build()))
@@ -214,7 +214,7 @@ def run() -> None:
 
 def _add_file_sink_definitions(table_env, bronze_root: str, quarantine_root: str) -> None:
     """Actual filesystem/Parquet sink definitions, one entity path per contract."""
-    column_list = "entity STRING, primary_key STRING, op STRING, source_lsn BIGINT, source_tx_id STRING, source_event_ts STRING, kafka_topic STRING, kafka_partition INT, kafka_offset BIGINT, snapshot STRING, original_envelope STRING, processed_at STRING, event_date STRING"
+    column_list = "entity STRING, primary_key STRING, op STRING, source_lsn BIGINT, source_tx_id STRING, transaction_id STRING, transaction_total_order BIGINT, transaction_data_collection_order BIGINT, source_event_ts STRING, kafka_topic STRING, kafka_partition INT, kafka_offset BIGINT, snapshot STRING, original_envelope STRING, processed_at STRING, event_date STRING"
     for entity in sorted(CDC_ENTITIES):
         table_env.execute_sql(f"CREATE TEMPORARY TABLE bronze_cdc_{entity} ({column_list}) PARTITIONED BY (event_date) WITH ('connector'='filesystem', 'path'='{bronze_root}/{entity}', 'format'='parquet')")
     table_env.execute_sql(f"CREATE TEMPORARY TABLE quarantine_cdc (entity STRING, kafka_topic STRING, kafka_partition INT, kafka_offset BIGINT, original_payload STRING, rejection_reason STRING, processed_at STRING, event_date STRING) PARTITIONED BY (event_date) WITH ('connector'='filesystem', 'path'='{quarantine_root}/unclassified', 'format'='parquet')")
@@ -226,10 +226,10 @@ def _submit_writes(table_env) -> None:
     for entity in sorted(CDC_ENTITIES):
         statements.add_insert_sql(f"INSERT INTO bronze_cdc_{entity} SELECT * FROM bronze_cdc_input WHERE entity = '{entity}'")
     statements.add_insert_sql("INSERT INTO quarantine_cdc SELECT * FROM quarantine_cdc_input")
-    statements.add_insert_sql("INSERT INTO mdep.silver.core_customers SELECT customer_id, customer_name, email, customer_status, created_at, NULL, preferred_language, source_lsn, source_tx_id, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'customers'")
-    statements.add_insert_sql("INSERT INTO mdep.silver.core_products SELECT product_id, product_name, category_code, CAST(unit_price AS DECIMAL(12,2)), currency, NULL, source_lsn, source_tx_id, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'products'")
-    statements.add_insert_sql("INSERT INTO mdep.silver.core_orders SELECT order_id, customer_id, order_status, order_ts, currency, CAST(order_total AS DECIMAL(12,2)), NULL, source_lsn, source_tx_id, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'orders'")
-    statements.add_insert_sql("INSERT INTO mdep.silver.core_payments SELECT payment_id, order_id, payment_status, payment_ts, CAST(amount AS DECIMAL(12,2)), currency, authorization_code, NULL, source_lsn, source_tx_id, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'payments'")
+    statements.add_insert_sql("INSERT INTO mdep.silver.core_customers SELECT customer_id, customer_name, email, customer_status, created_at, NULL, preferred_language, source_lsn, source_tx_id, transaction_id, transaction_total_order, transaction_data_collection_order, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'customers'")
+    statements.add_insert_sql("INSERT INTO mdep.silver.core_products SELECT product_id, product_name, category_code, CAST(unit_price AS DECIMAL(12,2)), currency, NULL, source_lsn, source_tx_id, transaction_id, transaction_total_order, transaction_data_collection_order, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'products'")
+    statements.add_insert_sql("INSERT INTO mdep.silver.core_orders SELECT order_id, customer_id, order_status, order_ts, currency, CAST(order_total AS DECIMAL(12,2)), NULL, source_lsn, source_tx_id, transaction_id, transaction_total_order, transaction_data_collection_order, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'orders'")
+    statements.add_insert_sql("INSERT INTO mdep.silver.core_payments SELECT payment_id, order_id, payment_status, payment_ts, CAST(amount AS DECIMAL(12,2)), currency, authorization_code, NULL, source_lsn, source_tx_id, transaction_id, transaction_total_order, transaction_data_collection_order, source_event_ts, kafka_topic, kafka_partition, kafka_offset, applied_at FROM silver_cdc_changelog WHERE entity = 'payments'")
     statements.execute()
 
 

@@ -6,7 +6,11 @@
 
 ## How do you reject stale and duplicate CDC events?
 
-**Direct answer:** compare source LSN per `entity:primary_key` and apply only a higher LSN. **Project example:** lower LSN is ignored even if it arrives later; the same topic/partition/offset is an exact replay; the same LSN from another transport coordinate is not considered newer. **Follow-up:** “Why not partition number?” A Kafka partition is not a global database clock. **Senior extension:** retain source position for audit/replay and validate behavior under failover.
+**Direct answer:** compare source LSN per `entity:primary_key`, then same-transaction Debezium total order when available. **Project example:** lower LSN is ignored; a higher `transaction.total_order` can apply at equal LSN; identical known topic/partition/offset is replay only. **Follow-up:** “Why not partition number?” A Kafka partition is not a global database clock. **Senior extension:** retain source position for audit/replay and validate behavior under failover.
+
+## Can two CDC events with the same LSN still need ordering?
+
+**Direct answer:** Yes. When Debezium reports both events in the same transaction and supplies `transaction.total_order`, that order distinguishes them. **Project example:** MDEP-11 applies the larger valid total order at equal LSN, but rejects a lower one. **Follow-up:** “What if metadata is absent?” A known equal topic/partition/offset is an exact replay; otherwise the event is an ambiguous equal-position conflict and does not mutate Silver. **Senior extension:** PostgreSQL LSN is database-log order, Debezium total order is intra-transaction order, Kafka coordinates are transport identity, and watermarks only express time/lateness.
 
 ## What are checkpoint, savepoint, watermark, and tombstone?
 

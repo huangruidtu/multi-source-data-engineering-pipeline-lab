@@ -14,6 +14,6 @@ The validator builds the exact image, starts dependencies, checks Connect and Jo
 flink run -py /opt/flink/usrlib/mdep/flink_cdc_job.py
 ```
 
-It has no placeholder JAR. After submission, create a PostgreSQL customer insert/update/delete, replay lower-LSN and exact records, send a malformed envelope and allow a tombstone. Inspect `bronze/cdc/<entity>/event_date=...`, `quarantine/cdc/...`, `mdep.silver.core_*`, checkpoint recovery, and Iceberg snapshots.
+It has no placeholder JAR. After submission, create a PostgreSQL customer insert/update/delete, replay lower-LSN and exact records, and create a multi-change transaction to inspect configured Debezium `transaction.id`/`total_order` behavior. Send a malformed envelope and allow a tombstone. Inspect `bronze/cdc/<entity>/event_date=...`, including transaction audit columns, `quarantine/cdc/...`, `mdep.silver.core_*`, checkpoint recovery, and Iceberg snapshots.
 
 This is a reproducible **implementation path**, not runtime evidence. Docker, S3 credentials, connector startup, and physical Iceberg commits are unvalidated on the current host.
