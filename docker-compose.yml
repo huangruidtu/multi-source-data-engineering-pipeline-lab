@@ -104,5 +104,38 @@ services:
       kafka:
         condition: service_healthy
 
+  flink-jobmanager:
+    build:
+      context: ./processing/flink
+    command: jobmanager
+    environment:
+      ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop-1.20.0.jar
+      PYTHONPATH: /opt/flink/usrlib
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+    ports:
+      - "8082:8081"
+    volumes:
+      - ./processing/flink:/opt/flink/usrlib/mdep:ro
+      - ./build/mdep-11-checkpoints:/opt/flink/checkpoints
+      - ./build/mdep-11-savepoints:/opt/flink/savepoints
+
+  flink-taskmanager:
+    build:
+      context: ./processing/flink
+    command: taskmanager
+    environment:
+      ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop-1.20.0.jar
+      PYTHONPATH: /opt/flink/usrlib
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - ./processing/flink:/opt/flink/usrlib/mdep:ro
+    depends_on:
+      - flink-jobmanager
+
 volumes:
   postgres_data:
