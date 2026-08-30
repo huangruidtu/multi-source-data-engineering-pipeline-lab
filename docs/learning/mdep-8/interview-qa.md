@@ -27,3 +27,7 @@
 ## What was actually validated?
 
 **Answer:** deterministic paths, metadata/hashing, duplicate detection, simulated 429 pagination, real local file Parquet generation/inspection, Quarantine artifacts, rerun publication, and static compilation. **Follow-up:** Airflow/PostgreSQL? **Senior extension:** they remain unvalidated on this host because Docker, Airflow, and psycopg are unavailable; I would run the documented commands in a compatible environment before claiming completion.
+
+## How would you make the local runtime reproducible for review?
+
+**Answer:** start the Compose stack and run `validate-mdep-8-runtime.ps1`; it provisions the source services and Airflow, resets sources, runs the DAG twice for idempotency, runs a backfill, and checks Bronze/Quarantine output. **Example:** the Airflow service receives Docker-network DSNs and mounts the project read-only. **Follow-up:** did you execute it? **Senior extension:** not on this host because Docker is absent; the script is an executable review procedure, not a validation claim.

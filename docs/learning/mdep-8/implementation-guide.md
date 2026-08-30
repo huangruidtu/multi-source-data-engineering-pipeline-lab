@@ -42,6 +42,8 @@ s3://<bucket>/quarantine/<source>/<entity>/ingest_date=YYYY-MM-DD/ingestion_id=<
 
 Local validation uses the same keys below `BRONZE_LOCAL_ROOT`; setting `BRONZE_S3_BUCKET` selects the optional boto3 S3 store.
 
+For a Docker-capable developer, `docker compose up --build --wait` now also starts an Airflow 2.10.5 container. It mounts the repository read-only for DAG/source access and writes local Bronze output to `build/mdep-8-bronze`. `scripts/validate-mdep-8-runtime.ps1` automates DAG discovery, normal run, same-interval rerun, historical backfill, and Parquet metadata inspection.
+
 ## Idempotency and deferred work
 
 `BronzePublisher` uses deterministic keys plus exclusive create. A completed rerun sees the object and manifest and returns `already_published`; it never appends a second canonical object. A temporary Parquet file is built before publication. `max_active_runs=1` prevents concurrent DAG runs; multi-scheduler race hardening, schema registry, S3 lifecycle/encryption, and production checkpoint persistence are deferred.
