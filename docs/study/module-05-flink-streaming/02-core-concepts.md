@@ -7,7 +7,7 @@
 `version_decision` accepts higher LSN, then higher `transaction.total_order` for the same transaction, then only exact known topic/partition/offset as replay. Equal unknown positions are conservatively rejected. Watermarks use source event time for lateness analysis, not correctness; Kafka partition number is never freshness.
 
 ## Delivery semantics
-The job configures exactly-once checkpoints and fixed-delay restart. End-to-end exactly-once depends on source offsets, checkpoint completion and sink commit behavior, which is **RUNTIME UNVALIDATED**. At-least-once replay must still converge through state rules.
+The job configures exactly-once checkpoints and fixed-delay restart. End-to-end exactly-once depends on source offsets, checkpoint completion and sink commit behavior, which is **RUNTIME DEFERRED — not runtime validated**. At-least-once replay must still converge through state rules.
 
 ## Flink application, JobManager, TaskManager, slots, and operators
 
@@ -63,7 +63,7 @@ Debezium `r` records are initial snapshot reads and may lack transaction metadat
 
 The job configures exactly-once checkpoint *mode* every 30 seconds, two-minute timeout, five-second minimum pause, three tolerable failures, and fixed-delay restart. Checkpoint barriers form a consistent recoverable cut across operators. A savepoint is an intentionally triggered operational snapshot; a checkpoint is recurring fault-recovery state. Aligned versus unaligned checkpoint tuning, max parallelism, rescaling, state TTL, backpressure metrics and RocksDB configuration are useful **GENERAL / NOT IMPLEMENTED** topics.
 
-Exactly-once is not a label earned by `CheckpointingMode.EXACTLY_ONCE`. It would require observed successful checkpoints, Kafka offset coordination and Iceberg sink commit behaviour. Those are **RUNTIME UNVALIDATED**. MDEP nevertheless designs for at-least-once replay convergence through the deterministic state rule.
+Exactly-once is not a label earned by `CheckpointingMode.EXACTLY_ONCE`. It would require observed successful checkpoints, Kafka offset coordination and Iceberg sink commit behaviour. Those are **RUNTIME DEFERRED — not runtime validated**. MDEP nevertheless designs for at-least-once replay convergence through the deterministic state rule.
 
 ## Interview framing
 

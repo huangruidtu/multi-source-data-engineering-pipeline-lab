@@ -1,6 +1,6 @@
 # MDEP V1 Study Guide
 
-This pack is a retrieval aid, not a claim that the platform has run in production. Read **IMPLEMENTED** for code/configuration present in the repository, **STATICALLY VALIDATED** for contract tests and parsers, and **RUNTIME UNVALIDATED** for the Docker, cloud, and engine exercises listed in [the debt register](../closure/runtime-debt-register.md).
+This pack is a retrieval aid, not a claim that the platform has run in production. Read **IMPLEMENTED** for code/configuration present in the repository, **OFFLINE / STATICALLY VALIDATED** for contract tests and parsers, and **RUNTIME DEFERRED — not runtime validated** for the Docker, cloud, and engine exercises listed in [the deferred register](../closure/runtime-debt-register.md).
 
 ## Structure and use
 
@@ -18,7 +18,7 @@ Start with [master architecture](01-master-architecture.md), then study modules 
 
 ## Time-boxes
 
-**2 hours:** master architecture, module 00 talking points, final playbook. **4 hours:** add modules 03–05. **8 hours:** add contracts, Airflow, Snowflake/dbt, and answer 30 Top-100 questions. **One day:** complete modules 00–07 plus failure files. **Two days:** read cited code and rehearse answers aloud. **One week:** execute the blocked validation matrix in a suitable environment, record evidence, then amend wording only where evidence permits.
+**2 hours:** master architecture, module 00 talking points, final playbook. **4 hours:** add modules 03–05. **8 hours:** add contracts, Airflow, Snowflake/dbt, and answer 30 Top-100 questions. **One day:** complete modules 00–07 plus failure files. **Two days:** read cited code and rehearse answers aloud. **V1.x lab:** execute the historically `BLOCKED` validation-matrix exercises in a suitable environment, record evidence, then amend wording only where evidence permits.
 
 ## Interview practice protocol
 

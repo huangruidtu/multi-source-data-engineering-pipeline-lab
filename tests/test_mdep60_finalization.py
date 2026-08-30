@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path('.')
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class Mdep60FinalizationTests(unittest.TestCase):

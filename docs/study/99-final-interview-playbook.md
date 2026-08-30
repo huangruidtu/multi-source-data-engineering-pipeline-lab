@@ -24,7 +24,7 @@ Use **PAUSE → CLARIFY → DIRECT → STRUCTURE → STOP**. State the boundary 
 
 ## Correct interview wording
 
-Say: “I implemented/configured/statically tested X.” Say: “I would validate Y using `validation/mdep-13-validation-matrix.yml`.” Do not say Spark/Iceberg/Kafka/Flink/Snowflake paths passed E2E; they are runtime unvalidated. 中文：诚实地说明债务会提升可信度。
+Say: “I implemented/configured/offline-tested X.” Say: “I would validate Y using `validation/mdep-13-validation-matrix.yml` in V1.x.” Do not say Spark/Iceberg/Kafka/Flink/Snowflake paths passed E2E; they are **RUNTIME DEFERRED — not runtime validated**. 中文：诚实地说明延后的物理验证会提升可信度。
 
 ## Production answer
 

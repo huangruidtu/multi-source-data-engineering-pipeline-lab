@@ -29,10 +29,10 @@ class StudyPackTests(unittest.TestCase):
 
     def test_no_placeholder_secret_or_unsupported_runtime_success_claim(self):
         text = "\n".join(path.read_text(encoding="utf-8") for path in STUDY.rglob("*.md"))
-        self.assertNotRegex(text, r"(?i)\\b(TODO|FIXME)\\b")
-        self.assertNotRegex(text, r"AKIA[0-9A-Z]{16}|(?i:password\\s*=|secret\\s*=)")
+        self.assertNotRegex(text, r"(?i)\b(TODO|FIXME)\b")
+        self.assertNotRegex(text, r"AKIA[0-9A-Z]{16}|(?i:password\s*=|secret\s*=)")
         self.assertNotIn("end-to-end passed", text.lower())
-        self.assertNotIn("runtime validated", text.lower())
+        self.assertNotRegex(text, r"(?i)(?<!not )runtime validated")
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ Replay and at-least-once delivery are expected. Batch reference Silver accepts a
 
 ## Security, cost, and current truth
 
-Credentials are environment configuration, not repository content. Production would constrain S3/IAM access, rotate secrets, monitor retained WAL, Kafka lag, checkpoint health, Iceberg small files, Snowflake credits, and dbt freshness. The code and static tests are present. Docker/Airflow/PostgreSQL, Spark/Iceberg, Debezium/Kafka, Flink/S3, Snowflake/dbt, and end-to-end reconciliation remain **RUNTIME UNVALIDATED**.
+Credentials are environment configuration, not repository content. Production would constrain S3/IAM access, rotate secrets, monitor retained WAL, Kafka lag, checkpoint health, Iceberg small files, Snowflake credits, and dbt freshness. The code and static tests are present. Docker/Airflow/PostgreSQL, Spark/Iceberg, Debezium/Kafka, Flink/S3, Snowflake/dbt, and end-to-end reconciliation are **RUNTIME DEFERRED — not runtime validated** in V1.
 
 ## Spoken restoration
 

@@ -40,7 +40,7 @@ This file is intentionally ordinary Python. It is not a mock of the topology: it
 
 `run` builds a source per topic from earliest offsets, wraps and unions raw strings, derives Bronze before semantic parsing, creates quarantine side output, assigns source-event watermarks, keys valid events, and bridges streams into Table API temporary views. `_add_file_sink_definitions` uses event-date partitions for Bronze/Quarantine. `_submit_writes` emits all entity history, quarantine and Silver inserts through one statement set.
 
-The configured `SimpleStringSchema` is value-only. Therefore physical parsing currently receives no Kafka key/partition/offset even though the pure contract can accept them. That limitation is documented rather than hidden. Kafka connection, checkpoint completion, S3 writes and Iceberg commits remain **RUNTIME UNVALIDATED**.
+The configured `SimpleStringSchema` is value-only. Therefore physical parsing currently receives no Kafka key/partition/offset even though the pure contract can accept them. That limitation is documented rather than hidden. Kafka connection, checkpoint completion, S3 writes and Iceberg commits are **RUNTIME DEFERRED — not runtime validated**.
 
 ## Tests as executable specification
 
