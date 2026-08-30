@@ -36,5 +36,27 @@ services:
       timeout: 3s
       retries: 15
 
+  airflow:
+    build:
+      context: .
+      dockerfile: orchestration/airflow/Dockerfile
+    command: standalone
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/orchestration/dags
+      POSTGRES_DSN: postgresql://lab:lab@postgres:5432/commerce
+      REST_SOURCE_BASE_URL: http://rest-source:8080/v1
+      BRONZE_LOCAL_ROOT: /opt/airflow/bronze
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./:/opt/airflow/project:ro
+      - ./build/mdep-8-bronze:/opt/airflow/bronze
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rest-source:
+        condition: service_healthy
+
 volumes:
   postgres_data:

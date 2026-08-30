@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def mdep_bronze_ingestion():
 
     @task
     def rest_reference(logical_date: str):
-        base = "http://localhost:8080/v1"
+        base = os.getenv("REST_SOURCE_BASE_URL", "http://localhost:8080/v1")
         return [land_rest(logical_date, "exchange_rates", f"{base}/exchange-rates?page_size=2"), land_rest(logical_date, "locations", f"{base}/locations?page_size=2")]
 
     @task

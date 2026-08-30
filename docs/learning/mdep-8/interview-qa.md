@@ -27,3 +27,7 @@
 ## What was actually validated?
 
 **Answer:** deterministic paths, metadata/hashing, duplicate detection, simulated 429 pagination, real local file Parquet generation/inspection, Quarantine artifacts, rerun publication, and static compilation. **Follow-up:** Airflow/PostgreSQL? **Senior extension:** they remain unvalidated on this host because Docker, Airflow, and psycopg are unavailable; I would run the documented commands in a compatible environment before claiming completion.
+
+## Is merged code the same as a validated pipeline?
+
+**Answer:** No. Merge records the reviewed implementation; it does not replace runtime acceptance evidence. **Example:** MDEP-8 has unit and local Parquet evidence, while PostgreSQL and Airflow runs remain unexecuted. **Follow-up:** what do you do next? **Senior extension:** maintain a validation matrix, keep affected Jira work in progress, and capture logs/output paths before closing it.

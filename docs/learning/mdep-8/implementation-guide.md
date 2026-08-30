@@ -45,3 +45,7 @@ Local validation uses the same keys below `BRONZE_LOCAL_ROOT`; setting `BRONZE_S
 ## Idempotency and deferred work
 
 `BronzePublisher` uses deterministic keys plus exclusive create. A completed rerun sees the object and manifest and returns `already_published`; it never appends a second canonical object. A temporary Parquet file is built before publication. `max_active_runs=1` prevents concurrent DAG runs; multi-scheduler race hardening, schema registry, S3 lifecycle/encryption, and production checkpoint persistence are deferred.
+
+## Merged-state validation boundary
+
+This implementation was merged before Docker/Airflow/PostgreSQL runtime acceptance was completed. PR #5 restores the previously omitted Airflow Compose service and `scripts/validate-mdep-8-runtime.ps1` from the MDEP-8 runtime setup. Their presence makes the validation procedure reproducible; it does not prove that the Docker/Airflow/PostgreSQL acceptance scenarios have run. See the follow-up validation plan before treating them as complete.
