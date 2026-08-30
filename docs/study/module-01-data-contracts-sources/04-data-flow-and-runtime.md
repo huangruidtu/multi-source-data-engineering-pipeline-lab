@@ -1,0 +1,3 @@
+# Module 01 — Data flow and runtime
+
+Take `customer_id=c-1001`. PostgreSQL enforces its primary key and an order’s customer relationship at the OLTP boundary. A bounded extractor reads the row, then Bronze enrichment adds `source_record_key=c-1001`, locator, extraction/ingestion time, deterministic ingestion identity and hash. An order whose customer is absent in a deliberately invalid fixture is not silently invented downstream: the source violation is an explicit failure exercise. For file `product_categories_duplicate.csv`, identical content has a content identity; landing/replay logic can recognise the repeated file. Schema and fixtures are **IMPLEMENTED**; physical PostgreSQL/REST/file stack execution is **RUNTIME DEFERRED — not runtime validated**.

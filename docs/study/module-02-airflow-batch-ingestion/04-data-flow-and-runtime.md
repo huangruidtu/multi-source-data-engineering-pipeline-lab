@@ -1,0 +1,3 @@
+# Module 02 — Data flow and runtime
+
+For the `2025-02-01` interval, Airflow constructs a `BatchContext` for `rest_api/exchange_rates`. The extractor calls each page, then enriches a rate with its source locator, record hash, interval identity and `ingested_at`. The publisher chooses `bronze/rest_api/exchange_rates/ingest_date=2025-02-01/ingestion_id=.../data.parquet` and a manifest. A 429 sleeps and retries; exhausted retries fail before partial Bronze publication. A rerun computes the same path and returns `already_published`. An invalid category row goes to its deterministic quarantine path. The DAG/runtime exercise is **RUNTIME DEFERRED — not runtime validated** despite the available Docker assets and script.

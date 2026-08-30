@@ -1,6 +1,10 @@
-# V1 runtime-debt register
+# V1 runtime-deferred register
 
-| debt_id | Story/component | Validation not executed and blocker | Class | Evidence/action | Blocks implementation closure? |
+**Scope amendment — 2026-08-30:** these items no longer block final V1
+completion. They remain an honest list of unexecuted physical integration work
+for a future V1.x hands-on validation phase. No row is runtime-validated.
+
+| debt_id | Story/component | Validation not executed / deferred reason | Class | Evidence/action | Blocks implementation closure? |
 | --- | --- | --- | --- | --- |
 | RD-08 | MDEP-8 Airflow/PostgreSQL/REST/files | Docker unavailable; DAG, rerun, backfill, Bronze/quarantine not physically observed | D | Compose logs, DAG/task logs, Parquet inspection | No; blocks runtime acceptance |
 | RD-09 | MDEP-9 Spark/Iceberg | Java, spark-submit, artifact/input unavailable; Silver merge/snapshots not observed | A/D | Spark output, Iceberg snapshots, stale replay query | No; blocks runtime acceptance |

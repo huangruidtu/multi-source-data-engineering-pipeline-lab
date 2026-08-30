@@ -68,6 +68,14 @@ The smallest complete V1 is all eight MUST HAVE Stories in the proposed backlog.
 
 The minimum path is MDEP-S01 through MDEP-S08 in dependency order. Estimated hands-on time is **78–106 hours** for a learner who performs the validation and failures manually. This is intentionally not an AI-generation estimate.
 
-## Definition of done for V1
+## Definition of done for final V1
 
-V1 is complete only when the developer can manually run the end-to-end path, intentionally trigger the listed failures, explain the resulting data and recovery behavior, and document what is actually implemented and validated. Planning documents alone do not satisfy any implementation acceptance criterion.
+**Amended 2026-08-30:** the original plan required manual end-to-end execution.
+That historical target is now a deferred V1.x hands-on validation phase, not a
+V1 blocker. Final V1 is complete when the architecture, implementation,
+configuration, deterministic/offline tests, reconciliation logic, failure and
+trade-off reasoning, documentation, and interview readiness are complete.
+
+Physical Airflow, Spark/Iceberg, Debezium/Kafka, Flink/S3, Snowflake/dbt, and
+cross-system E2E execution are **RUNTIME DEFERRED**. Their absence must remain
+visible and must never be represented as runtime validation.

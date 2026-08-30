@@ -1,6 +1,16 @@
 # V1 baseline
 
-**Status date:** 2026-08-30. V1 is a portfolio-ready **implementation and static-validation baseline**, not a runtime-accepted deployment.
+**Status date:** 2026-08-30. V1 is a portfolio-ready **implementation and
+offline/static-validation baseline**, not a runtime-accepted deployment.
+
+## Formal scope status
+
+The 2026-08-30 Charter amendment makes full physical infrastructure execution
+**RUNTIME DEFERRED** from final V1 acceptance. It is not removed from project
+history and may be completed as a separate V1.x hands-on lab. V1 still requires
+implemented configuration/code, offline/static validation, reconciliation
+logic, documented failure reasoning, architecture-to-code explanation, and
+interview readiness.
 
 ## Scope and components
 
