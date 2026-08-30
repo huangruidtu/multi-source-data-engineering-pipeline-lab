@@ -13,8 +13,13 @@ function Test-CommandAvailable {
 function Get-CommandVersion {
     param([string]$Name, [string[]]$Arguments = @('--version'))
     if (-not (Test-CommandAvailable $Name)) { return $null }
-    try { return ((& $Name @Arguments 2>&1 | Select-Object -First 1) -join ' ').Trim() }
-    catch { return 'available (version unavailable)' }
+    try {
+        $output = & $Name @Arguments 2>&1
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $firstLine = ($output | Select-Object -First 1) -join ' '
+        if ([string]::IsNullOrWhiteSpace($firstLine)) { return $null }
+        return $firstLine.Trim()
+    } catch { return $null }
 }
 
 function Get-EnvironmentPresence {
@@ -36,12 +41,15 @@ $requiredFiles = @(
     'validation/failure-scenarios.yml'
 )
 $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path (Join-Path $repoRoot $_)) })
-$dockerAvailable = Test-CommandAvailable docker
-$composeAvailable = $false
-if ($dockerAvailable) {
-    try { $composeAvailable = ((& docker compose version 2>$null) -match 'Docker Compose') }
-    catch { $composeAvailable = $false }
-}
+$dockerVersion = Get-CommandVersion docker @('version', '--format', '{{.Client.Version}}')
+$dockerAvailable = -not [string]::IsNullOrWhiteSpace($dockerVersion)
+$composeVersion = if ($dockerAvailable) { Get-CommandVersion docker @('compose', 'version') } else { $null }
+$composeAvailable = -not [string]::IsNullOrWhiteSpace($composeVersion)
+$pythonVersion = Get-CommandVersion python
+$javaVersion = Get-CommandVersion java @('-version')
+$sparkVersion = Get-CommandVersion spark-submit
+$dbtVersion = Get-CommandVersion dbt
+$snowVersion = Get-CommandVersion snow
 $snowflakeCredentials = Get-EnvironmentPresence @('SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_USER')
 $awsCredentials = Get-EnvironmentPresence @('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY')
 
@@ -49,14 +57,14 @@ $report = [ordered]@{
     generated_at_utc = (Get-Date).ToUniversalTime().ToString('o')
     repository_root = $repoRoot
     capabilities = [ordered]@{
-        docker = [ordered]@{ status = if ($dockerAvailable) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion docker @('version', '--format', '{{.Client.Version}}') }
-        docker_compose = [ordered]@{ status = if ($composeAvailable) { 'AVAILABLE' } else { 'BLOCKED' }; version = if ($composeAvailable) { Get-CommandVersion docker @('compose', 'version') } else { $null } }
-        python = [ordered]@{ status = if (Test-CommandAvailable python) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion python }
-        java = [ordered]@{ status = if (Test-CommandAvailable java) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion java @('-version') }
-        spark_submit = [ordered]@{ status = if (Test-CommandAvailable spark-submit) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion spark-submit }
+        docker = [ordered]@{ status = if ($dockerAvailable) { 'AVAILABLE' } else { 'BLOCKED' }; version = $dockerVersion }
+        docker_compose = [ordered]@{ status = if ($composeAvailable) { 'AVAILABLE' } else { 'BLOCKED' }; version = $composeVersion }
+        python = [ordered]@{ status = if ($pythonVersion) { 'AVAILABLE' } else { 'BLOCKED' }; version = $pythonVersion }
+        java = [ordered]@{ status = if ($javaVersion) { 'AVAILABLE' } else { 'BLOCKED' }; version = $javaVersion }
+        spark_submit = [ordered]@{ status = if ($sparkVersion) { 'AVAILABLE' } else { 'BLOCKED' }; version = $sparkVersion }
         powershell = [ordered]@{ status = if (Test-CommandAvailable pwsh) { 'AVAILABLE' } else { 'AVAILABLE' }; version = $PSVersionTable.PSVersion.ToString() }
-        dbt = [ordered]@{ status = if (Test-CommandAvailable dbt) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion dbt }
-        snowflake_cli = [ordered]@{ status = if (Test-CommandAvailable snow) { 'AVAILABLE' } else { 'BLOCKED' }; version = Get-CommandVersion snow }
+        dbt = [ordered]@{ status = if ($dbtVersion) { 'AVAILABLE' } else { 'BLOCKED' }; version = $dbtVersion }
+        snowflake_cli = [ordered]@{ status = if ($snowVersion) { 'AVAILABLE' } else { 'BLOCKED' }; version = $snowVersion }
         snowflake_credentials = [ordered]@{ status = if ($snowflakeCredentials.available) { 'AVAILABLE' } else { 'BLOCKED' }; present_variables = $snowflakeCredentials.present }
         aws_s3_credentials = [ordered]@{ status = if ($awsCredentials.available) { 'AVAILABLE' } else { 'BLOCKED' }; present_variables = $awsCredentials.present }
         repository_assets = [ordered]@{ status = if ($missingFiles.Count -eq 0) { 'AVAILABLE' } else { 'BLOCKED' }; missing_files = $missingFiles }

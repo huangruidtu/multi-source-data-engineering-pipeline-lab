@@ -16,6 +16,8 @@ This factual closing inventory does not claim every runtime path has been exerci
 
 MDEP-8 through MDEP-12 runtime debt is preserved in `validation/mdep-13-validation-matrix.yml`; MDEP-13 does not erase it.
 
+The matrix is a reviewed, versioned current-debt definition. A run-specific `validation-summary.json` is only the result of that one invocation: `BLOCKED` means the known environment cannot execute a stage, while `NOT_RUN` means that invocation deliberately did not attempt it. A passed local run does not change the matrix without reviewed durable evidence.
+
 ## Final architecture and evidence points
 
 ```mermaid

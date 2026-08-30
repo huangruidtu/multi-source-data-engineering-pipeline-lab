@@ -48,6 +48,24 @@ class Mdep13ValidationFrameworkTests(unittest.TestCase):
         for name in ("implementation-guide.md", "architecture-notes.md", "runbook.md", "learning-notes.md", "interview-qa.md", "interview-talking-points.md"):
             self.assertTrue((ROOT / "docs/learning/mdep-13" / name).is_file())
 
+    def test_runner_has_explicit_exit_code_and_self_test_contracts(self):
+        runner = (ROOT / "scripts/validate-mdep-13-e2e.ps1").read_text(encoding="utf-8")
+        self.assertIn("exit_code = $ExitCode", runner)
+        self.assertIn("if ($exitCode -ne 0)", runner)
+        self.assertIn("Set-Location -LiteralPath $WorkingDirectory", runner)
+        for stage in ("SELFTEST-SUCCESS", "SELFTEST-NATIVE-FAILURE", "SELFTEST-POWERSHELL-THROW", "SELFTEST-BLOCKED", "SELFTEST-NOT-RUN"):
+            self.assertIn(stage, runner)
+
+    def test_new_mdep13_text_has_no_unexpected_control_characters(self):
+        paths = [ROOT / "docs/project-evidence.md"]
+        paths += list((ROOT / "docs/learning/mdep-13").glob("*.md"))
+        paths += list((ROOT / "docs/interview").glob("*.md"))
+        paths += list(VALIDATION.rglob("*.yml"))
+        paths += list((ROOT / "scripts").glob("*mdep-13*.ps1"))
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            self.assertIsNone(re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", text), path)
+
     def test_no_literal_secrets_in_new_validation_assets(self):
         paths = list(VALIDATION.rglob("*")) + list((ROOT / "scripts").glob("*mdep-13*.ps1"))
         text = "\n".join(path.read_text(encoding="utf-8") for path in paths if path.is_file())
