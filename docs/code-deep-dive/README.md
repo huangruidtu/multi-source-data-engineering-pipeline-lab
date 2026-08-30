@@ -40,6 +40,17 @@ semantic model and then its Flink topology. Each document contains direct links
 to the source, tests, finalization architecture material, and interview topic
 that should be read beside it.
 
+## Batch 2: ingestion and CDC boundary
+
+1. [`source-extractors.md`](source-extractors.md) — source-specific REST, file, and PostgreSQL extraction rules.
+2. [`batch-pipeline.md`](batch-pipeline.md) — composition of extractors and deterministic Bronze publication.
+3. [`airflow-bronze-dag.md`](airflow-bronze-dag.md) — daily control-plane orchestration for the batch paths.
+4. [`cdc-transport-contracts.md`](cdc-transport-contracts.md) — small Kafka/Debezium transport-boundary rules.
+5. [`debezium-postgres-connector.md`](debezium-postgres-connector.md) — PostgreSQL connector prerequisite, snapshot, slot, and transaction-metadata configuration.
+
+Read Batch 2 with Batch 1 to trace `sources -> extractors -> pipeline -> Bronze`
+and `PostgreSQL -> Debezium transport -> Kafka boundary -> Flink CDC model`.
+
 ## Scope boundary
 
 Future batches may explain additional existing implementation files, but they
