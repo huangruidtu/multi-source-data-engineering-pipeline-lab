@@ -51,6 +51,15 @@ that should be read beside it.
 Read Batch 2 with Batch 1 to trace `sources -> extractors -> pipeline -> Bronze`
 and `PostgreSQL -> Debezium transport -> Kafka boundary -> Flink CDC model`.
 
+## Batch 3: analytics and validation
+
+1. [`snowflake-iceberg-setup.md`](snowflake-iceberg-setup.md) — external Iceberg access and native Gold destination.
+2. [`dbt-staging-models.md`](dbt-staging-models.md) — explicit Silver source boundary and typed staging projections.
+3. [`dbt-intermediate-models.md`](dbt-intermediate-models.md) — currency conversion and payment/order enrichment.
+4. [`dbt-gold-models.md`](dbt-gold-models.md) — dimensions, facts, marts, grain, deletes, and relationship evidence.
+5. [`validation-matrix.md`](validation-matrix.md) — evidence-oriented runtime/debt status matrix.
+6. [`validation-runner-reconciliation.md`](validation-runner-reconciliation.md) — recorded command outcomes and cross-layer reconciliation templates.
+
 ## Scope boundary
 
 Future batches may explain additional existing implementation files, but they
