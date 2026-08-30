@@ -1,0 +1,3 @@
+# Module 05 — Data flow and runtime
+
+For an `orders|1001` update at LSN `0/11`, the raw Kafka value is retained as Bronze. Parser extracts `op=u`, `after`, LSN and transaction metadata. The key routes it to one state owner. If stored LSN is `0/10`, it updates current state. If LSN equals and transaction id matches, higher `total_order` wins; same known topic/partition/offset is an exact replay; same LSN without proof is rejected as conflict. A `d` event deletes the current row, while its later tombstone does not. A late event with higher LSN remains valid even if its event-time watermark is behind. Kafka, checkpoint, S3 and Iceberg execution are **RUNTIME UNVALIDATED**.

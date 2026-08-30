@@ -1,0 +1,3 @@
+# Module 04 — Data flow and runtime
+
+When `order_id=1001` changes from `created` to `completed`, PostgreSQL appends a WAL record. The publication/slot lets Debezium emit an update envelope with `before`, `after`, `source` including LSN, and `op=u` on `mdep.commerce.orders`, keyed by the primary key. An initial row is `r`; a delete is `d` and can be followed by a null tombstone. Kafka retains messages for replay; a restart can redeliver them. Metadata may identify transaction/order where supported, but no connector registration, BEGIN/END event or topic observation has executed: all are **RUNTIME UNVALIDATED**.

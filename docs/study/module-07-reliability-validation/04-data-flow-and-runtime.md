@@ -1,0 +1,3 @@
+# Module 07 — Data flow and runtime
+
+For a bounded run `run-2026-08-30`, preflight asks whether Docker, Java/Spark, S3/AWS, Snowflake and dbt are available. M8 may be marked `BLOCKED` because Docker is absent; that is materially different from `NOT_RUN`, which means the stage was not invoked. If a component runs, its command, logs and evidence path support its own status. Reconciliation would compare source/Silver/Gold `order_id` keys, duplicate/null exceptions and compatible aggregates—not Bronze history count to Gold fact count. On this host the matrix records all M8–M13 runtime stages **BLOCKED**, so no physical E2E result is claimed.

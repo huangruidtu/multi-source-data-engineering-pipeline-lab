@@ -1,0 +1,3 @@
+# Module 00 — Data flow and runtime
+
+For `order_id=1001`, a PostgreSQL snapshot can land as enriched Bronze with `ingestion_id`, `source_locator`, `record_hash`, and timestamps. It is not Spark’s batch Silver target once CDC owns orders. A later WAL update becomes a Debezium envelope, is keyed as `orders|1001`, and Flink accepts it only when CDC position is newer. The current order becomes external Silver; dbt’s `fct_orders` represents one current order. A delete removes current state but Bronze preserves prior evidence. Retrying an input is safe only because batch deterministic paths and CDC version decisions make replay non-mutating. These runtime transitions are designed and statically tested; execution remains **RUNTIME UNVALIDATED**.
