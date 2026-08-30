@@ -104,5 +104,32 @@ services:
       kafka:
         condition: service_healthy
 
+  flink-jobmanager:
+    image: flink:1.20.0-scala_2.12-java17
+    command: jobmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+    ports:
+      - "8082:8081"
+    volumes:
+      - ./processing/flink:/opt/flink/usrlib/mdep:ro
+      - ./build/mdep-11-checkpoints:/opt/flink/checkpoints
+      - ./build/mdep-11-savepoints:/opt/flink/savepoints
+
+  flink-taskmanager:
+    image: flink:1.20.0-scala_2.12-java17
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - ./processing/flink:/opt/flink/usrlib/mdep:ro
+    depends_on:
+      - flink-jobmanager
+
 volumes:
   postgres_data:
