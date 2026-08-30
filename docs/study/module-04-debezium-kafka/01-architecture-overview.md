@@ -96,4 +96,4 @@ Connector recovery has two independent state domains: the PostgreSQL slot and Ka
 2. A slot is both a recovery aid and a retained-WAL risk.
 3. Debezium envelope metadata describes source changes; it does not itself materialize current state.
 4. Kafka provides ordered records within a partition and replayable retention, not global source freshness.
-5. The connector is configured and statically checked, while runtime observation remains explicitly blocked.
+5. The connector is configured and statically checked, while runtime observation is **RUNTIME DEFERRED — not runtime validated in V1**.
