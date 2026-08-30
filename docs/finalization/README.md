@@ -38,7 +38,7 @@ flowchart LR
   V -. verifies .-> G
 ```
 
-**V1:** IMPLEMENTED + OFFLINE / STATICALLY VALIDATED.  
+**V1:** IMPLEMENTED + OFFLINE / STATICALLY VALIDATED.
 **V1.x:** PHYSICAL RUNTIME INTEGRATION DEFERRED — not runtime validated.
 
 ### Architecture walkthrough
