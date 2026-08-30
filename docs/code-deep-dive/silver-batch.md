@@ -2,6 +2,13 @@
 
 **Source of truth:** [`processing/spark/silver_batch.py`](../../processing/spark/silver_batch.py), with pure ordering rules in [`processing/spark/contracts.py`](../../processing/spark/contracts.py). This walkthrough describes MDEP implementation and offline tests; Spark/Iceberg execution is **MDEP RUNTIME DEFERRED**.
 
+## Read beside
+
+- **Source files:** [`processing/spark/silver_batch.py`](../../processing/spark/silver_batch.py) and [`processing/spark/contracts.py`](../../processing/spark/contracts.py)
+- **Test file:** [`tests/test_silver_contracts.py`](../../tests/test_silver_contracts.py)
+- **Related architecture:** [`docs/finalization/key-design-decisions.md`](../finalization/key-design-decisions.md)
+- **Related interview topic:** [`docs/finalization/interview-qa.md`](../finalization/interview-qa.md) — batch deduplication and Silver replay safety
+
 ## 1. Why this file exists
 
 This is MDEP-9's batch Bronze-to-Silver job for exactly two reference entities: REST `exchange_rates` and file-derived `locations`. It creates Iceberg tables, reads MDEP-8 Bronze Parquet, validates/normalizes it, selects one deterministic winner per business key, quarantines non-winners/invalid rows, and merges winners into current Silver state.

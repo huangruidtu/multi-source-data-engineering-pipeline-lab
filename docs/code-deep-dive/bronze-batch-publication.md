@@ -2,6 +2,13 @@
 
 **Source of truth:** [`ingestion/batch/bronze.py`](../../ingestion/batch/bronze.py). It implements deterministic batch landing and can use a local object-store stand-in or S3 API adapter. Real AWS/S3 execution is **MDEP RUNTIME DEFERRED**.
 
+## Read beside
+
+- **Source file:** [`ingestion/batch/bronze.py`](../../ingestion/batch/bronze.py)
+- **Test file:** [`tests/test_bronze_ingestion.py`](../../tests/test_bronze_ingestion.py)
+- **Related architecture:** [`docs/finalization/data-model-and-grain.md`](../finalization/data-model-and-grain.md)
+- **Related interview topic:** [`docs/finalization/interview-cheat-sheet.md`](../finalization/interview-cheat-sheet.md) — deterministic Bronze landing and retry behavior
+
 ## 1. Why this file exists
 
 Bronze should be source-aligned evidence, not an anonymous collection of transformed records. This file gives each batch landing operation a stable identity, enriches each record with lineage fields, generates deterministic Bronze/Quarantine keys, and publishes a Parquet object plus a content manifest without overwriting an existing canonical object.

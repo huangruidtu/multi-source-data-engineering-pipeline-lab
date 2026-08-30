@@ -2,6 +2,13 @@
 
 **Source of truth:** [`processing/flink/cdc_model.py`](../../processing/flink/cdc_model.py) on `main`.  This is a code walkthrough, not evidence that the Flink runtime has been executed.
 
+## Read beside
+
+- **Source file:** [`processing/flink/cdc_model.py`](../../processing/flink/cdc_model.py)
+- **Test file:** [`tests/test_flink_cdc_model.py`](../../tests/test_flink_cdc_model.py)
+- **Related architecture:** [`docs/finalization/end-to-end-data-flow.md`](../finalization/end-to-end-data-flow.md)
+- **Related interview topic:** [`docs/finalization/interview-qa.md`](../finalization/interview-qa.md) — CDC ordering, replay, and delete semantics
+
 ## 1. Why this file exists
 
 The Flink job needs a small set of correctness rules that are too important to hide inside a JVM-dependent streaming topology. This module turns a Debezium message into a typed `CdcEvent`, decides whether it can replace the current version for one business key, and offers an in-memory oracle for tests. Keeping those rules pure means a reviewer can test CDC ordering without Kafka, PyFlink, Iceberg, or Docker.

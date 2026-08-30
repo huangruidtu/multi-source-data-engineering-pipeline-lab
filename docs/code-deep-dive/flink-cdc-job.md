@@ -2,6 +2,13 @@
 
 **Source of truth:** [`processing/flink/flink_cdc_job.py`](../../processing/flink/flink_cdc_job.py), read with [`cdc_model.py`](cdc-model.md). The file defines a runnable PyFlink topology, but its Kafka/Flink/Iceberg runtime behavior is **MDEP RUNTIME DEFERRED — not runtime validated in V1**.
 
+## Read beside
+
+- **Source file:** [`processing/flink/flink_cdc_job.py`](../../processing/flink/flink_cdc_job.py)
+- **Test files:** [`tests/test_flink_topology.py`](../../tests/test_flink_topology.py) and [`tests/test_flink_cdc_model.py`](../../tests/test_flink_cdc_model.py)
+- **Related architecture:** [`docs/finalization/architecture-implementation-mapping.md`](../finalization/architecture-implementation-mapping.md)
+- **Related interview topic:** [`docs/finalization/interview-cheat-sheet.md`](../finalization/interview-cheat-sheet.md) — CDC path and exactly-once boundary
+
 ## 1. Why this file exists
 
 This MDEP-11 job is the physical streaming counterpart to the pure CDC model. It describes a Kafka source for the four commerce topics, archives raw CDC evidence to Bronze, parses valid events, routes invalid/stale events to side outputs, maintains keyed current state in managed Flink state, and writes changelog rows to Iceberg Silver tables.
