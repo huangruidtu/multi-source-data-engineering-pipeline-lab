@@ -20,6 +20,8 @@ the repository and interview discussion.
 Start with the [Master Map](master-map.md) for an end-to-end reading route,
 interview-topic routes, and time-boxed study plans.
 
+For active, source-grounded exercises, use the [Practical Engineering Task Bank](../practical-training/README.md).
+
 ## Status labels
 
 | Label | Meaning |
