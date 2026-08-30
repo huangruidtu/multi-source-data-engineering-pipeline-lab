@@ -4,6 +4,10 @@ Reusable, source-grounded exercises for debugging, review, design, testing, and 
 
 **Modes:** (1) answer verbally then check the solution; (2) write a test/SQL/pseudocode patch separately, then compare; (3) answer the interview deliverable without repository notes.
 
+## Training workflow
+
+`Task file → learner attempt → solution review → training record`. Keep attempts in a dated copy of a [training-record template](training-records/README.md), not in canonical task or solution files.
+
 **Recommended order:** 01 → 04 → 05 → 02 → 06 → 07 → 08. For 30 minutes, do one CDC task, one Spark task, and one validation task. For 2 hours, complete 01, 04, 06, and 07. For full practice, complete every module and record missed invariants.
 
 Truth labels: **MDEP IMPLEMENTED** = source/config exists; **MDEP OFFLINE TESTED** = unit/static contract evidence; **MDEP RUNTIME DEFERRED** = physical execution not claimed; **GENERAL / PRODUCTION CONCEPT — NOT IMPLEMENTED** = discussion context only.
