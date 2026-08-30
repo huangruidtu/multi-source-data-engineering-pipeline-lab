@@ -4,11 +4,10 @@ sources:
     database: MDEP
     schema: SILVER_EXT
     freshness: {warn_after: {count: 24, period: hour}, error_after: {count: 72, period: hour}}
-    loaded_at_field: applied_at
     tables:
-      - {name: core_customers, identifier: CORE_CUSTOMERS}
-      - {name: core_products, identifier: CORE_PRODUCTS}
-      - {name: core_orders, identifier: CORE_ORDERS}
-      - {name: core_payments, identifier: CORE_PAYMENTS}
+      - {name: core_customers, identifier: CORE_CUSTOMERS, loaded_at_field: "try_to_timestamp_tz(applied_at)"}
+      - {name: core_products, identifier: CORE_PRODUCTS, loaded_at_field: "try_to_timestamp_tz(applied_at)"}
+      - {name: core_orders, identifier: CORE_ORDERS, loaded_at_field: "try_to_timestamp_tz(applied_at)"}
+      - {name: core_payments, identifier: CORE_PAYMENTS, loaded_at_field: "try_to_timestamp_tz(applied_at)"}
       - {name: ref_exchange_rates, identifier: REF_EXCHANGE_RATES, loaded_at_field: ingested_at}
       - {name: ref_locations, identifier: REF_LOCATIONS, loaded_at_field: ingested_at}

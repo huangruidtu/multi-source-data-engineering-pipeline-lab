@@ -20,6 +20,14 @@
 
 **Direct answer:** an incremental merge updates by a `unique_key` rather than rebuilding every row. **Project example:** `fct_orders` merges by `order_id`, includes late `updated_at`/`applied_at`, and post-hook removes deleted Silver orders. **Follow-up:** full refresh rebuilds from current Silver and is the recovery option. **Senior extension:** use a lookback window or source change watermark when timestamps can arrive late.
 
+## Should every fact table be incremental?
+
+**Direct answer:** No. Incremental is a correctness/cost tradeoff, not a goal. **Deeper:** every upstream dependency and deletion path must be reconciled. **Project example:** MDEP-12 keeps `fct_orders` incremental for merge learning and cost, but rebuilds `fct_payments` so deleted payments and changed/deleted orders cannot leave stale links. **Follow-up:** measure table size and run time before optimizing. **Senior extension:** use incremental only with an explicit change-capture/reconciliation strategy.
+
+## How do source deletes propagate into an incremental warehouse model?
+
+**Direct answer:** the model needs explicit delete reconciliation; an absent source row is not delivered by an incremental select. **Project example:** `fct_orders` has a post-hook anti-join that removes Gold orders no longer in current Silver. **Follow-up:** `fct_payments` rebuilds instead, because its relationship also depends on orders. **Senior extension:** track tombstones/change feeds or periodic anti-join reconciliation at scale.
+
 ## How do dbt tests, freshness, orphan facts, and FX conversion work here?
 
 **Direct answer:** dbt uses unique/not-null/accepted-values/relationship/custom tests; freshness checks the most recent externally visible timestamp. **Project example:** missing customers leave a visible null key/relationship failure; DKK conversion uses order date/base currency and leaves missing rates null with a flag. **Follow-up:** do not silently drop orphans or make up FX. **Senior extension:** route/reconcile operational data-quality incidents to Silver owners.

@@ -37,11 +37,17 @@ models:
       - name: order_status
         tests: [{accepted_values: {values: [created, completed, cancelled]}}]
   - name: fct_payments
-    description: "Grain: one current payment."
+    description: "Grain: one current payment; rebuilt table retains orphan evidence."
     columns:
       - name: payment_id
         tests: [not_null, unique]
       - name: payment_status
         tests: [{accepted_values: {values: [authorized, completed, failed, refunded]}}]
+      - name: order_id
+        tests:
+          - relationships:
+              to: ref('fct_orders')
+              field: order_id
+              config: {severity: warn}
   - name: mart_daily_sales
     description: "Grain: one order date and source currency. Missing conversion stays visible."

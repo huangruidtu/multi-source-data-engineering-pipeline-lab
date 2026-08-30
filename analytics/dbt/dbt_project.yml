@@ -9,6 +9,6 @@ snapshot-paths: [snapshots]
 clean-targets: [target, dbt_packages]
 models:
   mdep_analytics:
-    staging: {materialized: view, schema: gold}
-    intermediate: {materialized: view, schema: gold}
-    marts: {materialized: table, schema: gold}
+    staging: {materialized: view}
+    intermediate: {materialized: view}
+    marts: {materialized: table}
