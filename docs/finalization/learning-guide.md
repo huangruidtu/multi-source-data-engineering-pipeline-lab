@@ -9,8 +9,11 @@ copy of every explanation.
 
 1. Read [Architecture ↔ Implementation Mapping](architecture-implementation-mapping.md).
 2. Read [Final V1 Offline Validation Coverage](offline-validation-coverage.md).
-3. Read `source-data/contracts/commerce-operations.md` for entity ownership.
-4. Follow the flow in `README.md` and `docs/project-evidence.md`.
+3. Follow [End-to-End Data Flow](end-to-end-data-flow.md) for an order and a
+   reference-data record.
+4. Read [Data Model and Grain](data-model-and-grain.md), then
+   [Key Design Decisions](key-design-decisions.md).
+5. Read `source-data/contracts/commerce-operations.md` for entity ownership.
 
 The core interview narrative is: sources land immutably in Bronze; one canonical
 writer owns each Silver dataset; dbt owns Gold; reconciliation and failure logic
@@ -90,6 +93,14 @@ The per-story learning documents under `docs/learning/mdep-6` through
 `docs/study/` is supplementary reading, not the final source of truth. For the
 final project narrative and concise prompts, use
 [Interview Q&A](interview-qa.md) and `docs/interview/v1-final-story.md`.
+
+## Return-to-code path
+
+Use [Code Reading Guide](code-reading-guide.md) to revisit the real source by
+track. Read [Failure and Recovery Reasoning](failure-and-recovery-reasoning.md)
+alongside `validation/failure-scenarios.yml`. Finish with
+[Production Gap Analysis](production-gap-analysis.md): it names future
+recommendations without treating them as V1 implementation.
 
 ## What to say honestly
 

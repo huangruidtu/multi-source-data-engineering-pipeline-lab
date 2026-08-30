@@ -62,6 +62,9 @@ closure policy, and the validation framework. The final matrix records the
 remaining V1.x runtime work and never treats it as a failed V1 implementation.
 
 - [Architecture ↔ Implementation Mapping](docs/finalization/architecture-implementation-mapping.md)
+- [End-to-End Data Flow](docs/finalization/end-to-end-data-flow.md)
+- [Key Design Decisions](docs/finalization/key-design-decisions.md)
+- [Data Model and Grain](docs/finalization/data-model-and-grain.md)
 - [Offline Validation Coverage](docs/finalization/offline-validation-coverage.md)
 - [Runtime-Deferred Register](docs/closure/runtime-debt-register.md)
 - [V1 Scope and Acceptance Model](docs/planning/v1-scope.md)
@@ -82,6 +85,9 @@ remaining V1.x runtime work and never treats it as a failed V1 implementation.
 
 - [Final Learning Guide](docs/finalization/learning-guide.md)
 - [Project-specific Interview Q&A](docs/finalization/interview-qa.md)
+- [Code Reading Guide](docs/finalization/code-reading-guide.md)
+- [Failure and Recovery Reasoning](docs/finalization/failure-and-recovery-reasoning.md)
+- [Production Gap Analysis](docs/finalization/production-gap-analysis.md)
 - [Architecture Walkthrough](docs/interview/architecture-walkthrough.md)
 - [Final V1 Story](docs/interview/v1-final-story.md)
 - [Story-level Learning Notes](docs/learning/README.md)
