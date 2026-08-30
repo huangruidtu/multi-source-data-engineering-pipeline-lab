@@ -1,0 +1,22 @@
+{
+  "name": "mdep-postgres-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "lab",
+    "database.password": "lab",
+    "database.dbname": "commerce",
+    "plugin.name": "pgoutput",
+    "publication.name": "mdep_publication",
+    "publication.autocreate.mode": "disabled",
+    "slot.name": "mdep_debezium_slot",
+    "slot.drop.on.stop": "false",
+    "topic.prefix": "mdep",
+    "table.include.list": "commerce.customers,commerce.products,commerce.orders,commerce.payments",
+    "snapshot.mode": "initial",
+    "tombstones.on.delete": "true",
+    "include.transaction": "true"
+  }
+}
