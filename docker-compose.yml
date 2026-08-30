@@ -105,9 +105,12 @@ services:
         condition: service_healthy
 
   flink-jobmanager:
-    image: flink:1.20.0-scala_2.12-java17
+    build:
+      context: ./processing/flink
     command: jobmanager
     environment:
+      ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop-1.20.0.jar
+      PYTHONPATH: /opt/flink/usrlib
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         state.checkpoints.dir: file:///opt/flink/checkpoints
@@ -120,9 +123,12 @@ services:
       - ./build/mdep-11-savepoints:/opt/flink/savepoints
 
   flink-taskmanager:
-    image: flink:1.20.0-scala_2.12-java17
+    build:
+      context: ./processing/flink
     command: taskmanager
     environment:
+      ENABLE_BUILT_IN_PLUGINS: flink-s3-fs-hadoop-1.20.0.jar
+      PYTHONPATH: /opt/flink/usrlib
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 2

@@ -1,9 +1,15 @@
 # MDEP-11 implementation guide
 
-MDEP-11 is the canonical CDC current-state writer: Kafka Debezium topics feed Flink, which preserves append-oriented evidence at `bronze/cdc/<entity>/event_date=...` and applies only newer events to `mdep.silver.core_customers`, `core_products`, `core_orders`, and `core_payments`. Spark remains restricted to batch reference tables.
+## Implemented
 
-`processing/flink/cdc_model.py` is the actual normalized event contract: entity, primary key, `before`/`after`, operation, parsed source LSN, transaction/source time, topic/partition/offset, snapshot marker, and original envelope. Malformed records raise a reason for Quarantine; Kafka null tombstones are classified and ignored for Silver. `flink_cdc_job.py` records the topology contract and explicit 30-second checkpoint configuration; runtime submission is deliberately blocked until documented Kafka/Iceberg connector jars are provided.
+`processing/flink/flink_cdc_job.py` is now a real PyFlink topology, not a guard-rail stub. It creates one `KafkaSource` per approved Debezium topic, starts each at the earliest retained offset under `mdep-flink-cdc-silver-v1`, normalizes each value through `parse_debezium`, emits malformed records to a Flink side output, and keys valid records by `entity:primary_key`.
 
-Per key, `(source_lsn, kafka_partition, kafka_offset)` is the version tuple. LSN is primary database order; partition/offset are only transport tie-breakers. A lower/equal tuple is ignored, including exact replay. `r`, `c`, and `u` upsert `after`; newer `d` physically deletes. Bronze preserves the original envelope regardless. `preferred_language` is retained in the generic `after` object, so the MDEP-10 additive field can flow into the customer Iceberg schema once the runtime sink is installed.
+`CdcStateApplier` is a `KeyedProcessFunction` with managed `ValueState` for the last accepted CDC version and the prior current row. `r`/`c`/`u` emit an Iceberg changelog insert/upsert; a newer `d` emits a physical delete from the stored prior row; tombstones, stale events, replays, and equal-LSN transport conflicts produce no Silver mutation.
 
-Docker Compose adds JobManager and TaskManager with local mounted checkpoint/savepoint directories. Checkpoints are automatic recovery state and contain Kafka source/operator state; savepoints are manually triggered upgrade/migration state. Neither has been exercised.
+The topology writes append-oriented Bronze and Quarantine using Flink filesystem Parquet tables. It creates the approved HadoopCatalog at `mdep`, database `silver`, and V2 Iceberg tables `core_customers`, `core_products`, `core_orders`, and `core_payments`; all retain source LSN, transaction, source-time, transport, and `applied_at` audit fields. `preferred_language` is nullable in `core_customers`.
+
+## PyFlink Kafka metadata limitation
+
+Flink 1.20 PyFlink's public `KafkaSource` wrapper supports value-only deserialization, not a Python record deserializer exposing Kafka key, partition, and offset. Topic is accurately preserved because the job creates one source per known topic. The primary key is derived from Debezium `after`/`before`; partition and offset are null rather than invented. A metadata-capable Java deserializer may use the same `CdcEvent` contract later.
+
+**Static checks passed:** Python compilation, 13 model/topology tests, PowerShell parser, and Git whitespace check. **Runtime unvalidated:** Docker build, Kafka, Debezium, Flink state/checkpoint recovery, S3 Parquet, and Iceberg commits have not run on this host.

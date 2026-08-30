@@ -1,8 +1,7 @@
 # MDEP-11 learning notes
 
-- **Keyed state:** Flink keys by source primary key and stores the last applied LSN/partition/offset, preventing replay/stale regression.
-- **Checkpoint/savepoint:** checkpoints are automatic Kafka-offset and operator-state recovery; savepoints are deliberate migration/upgrade state.
-- **Event time/watermark:** source timestamp drives date/late handling; a 60-second watermark does not replace LSN for current-state ordering.
-- **Duplicate/stale/delete/tombstone:** same/lower version tuple is ignored; a newer delete removes state; a Kafka tombstone is a null transport record, not a second database delete.
-- **Iceberg:** HadoopCatalog tables provide snapshot current state once the streaming sink runtime is installed. Checkpoint-aligned commits are expected connector behavior, not validated evidence.
-- **Failure/scaling:** monitor source/Kafka lag, checkpoint time, backpressure, state growth, sink commits, and PostgreSQL replication-slot WAL retention before increasing parallelism or rescaling state.
+- `cdc_model.py` is a pure test oracle. `CdcStateApplier` is the real checkpointed Flink `ValueState` implementation.
+- A newer delete emits the stored prior row as `RowKind.DELETE`, clears current-row state, and retains the latest LSN to block a stale resurrection.
+- Exact replays, lower LSNs, and same-LSN different transport coordinates do not mutate Silver. Raw Bronze preserves their evidence.
+- Filesystem Parquet is used for Bronze and Quarantine. Iceberg V2 tables use primary keys and `write.upsert.enabled`; their physical behavior remains runtime unvalidated.
+- The existing S3-backed HadoopCatalog is retained. No Glue, Hive, REST catalog, Databricks, or alternative table format was introduced.

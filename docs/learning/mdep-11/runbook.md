@@ -1,14 +1,19 @@
 # MDEP-11 runbook
 
+`processing/flink/Dockerfile` is the reproducible package path. It builds on `flink:1.20.0-scala_2.12-java17`, installs `apache-flink==1.20.0`, downloads `flink-connector-kafka-3.3.0-1.20.jar` and `iceberg-flink-runtime-1.20-1.6.1.jar`, and enables Flink's bundled `flink-s3-fs-hadoop-1.20.0.jar`. Supply normal AWS/S3A credentials and a writable bucket; this repository does not create one.
+
 ```powershell
-docker compose up --build --wait
-./scripts/validate-mdep-10-cdc.ps1
-Invoke-WebRequest http://localhost:8082
-# package the Flink job with compatible Flink 1.20 Kafka and Iceberg runtime jars, then submit it:
-docker compose exec flink-jobmanager flink run /opt/flink/usrlib/mdep/<packaged-job>.jar
-docker compose exec flink-jobmanager flink list
+$env:AWS_ACCESS_KEY_ID = '<your access key>'
+$env:AWS_SECRET_ACCESS_KEY = '<your secret>'
+./scripts/validate-mdep-11-flink-cdc.ps1 -Bucket '<your bucket>'
 ```
 
-Inspect Debezium input with the MDEP-10 Kafka consumer, source slot/LSN with `psql`, and local artifacts under `build/mdep-11-checkpoints`, `build/mdep-11-savepoints`, Bronze CDC, Quarantine, and HadoopCatalog warehouse. Insert/update/delete a customer, then replay an old lower-LSN message and an exact duplicate; only newer state may change. Restart the Flink job and inspect checkpoint recovery and current Iceberg table/snapshots.
+The validator builds the exact image, starts dependencies, checks Connect and JobManager, then submits the Python job directly:
 
-The watermark exercise sends a source timestamp older than 60 seconds; record its late disposition separately from LSN acceptance. Run the MDEP-10 `preferred_language` alteration/update and verify a later Iceberg table schema/record. These commands are **UNVALIDATED** because Docker/Flink/Kafka/Iceberg are unavailable on this host.
+```text
+flink run -py /opt/flink/usrlib/mdep/flink_cdc_job.py
+```
+
+It has no placeholder JAR. After submission, create a PostgreSQL customer insert/update/delete, replay lower-LSN and exact records, send a malformed envelope and allow a tombstone. Inspect `bronze/cdc/<entity>/event_date=...`, `quarantine/cdc/...`, `mdep.silver.core_*`, checkpoint recovery, and Iceberg snapshots.
+
+This is a reproducible **implementation path**, not runtime evidence. Docker, S3 credentials, connector startup, and physical Iceberg commits are unvalidated on the current host.
