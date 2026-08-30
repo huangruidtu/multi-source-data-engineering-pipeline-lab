@@ -1,0 +1,47 @@
+version: 2
+models:
+  - name: dim_customers
+    description: "Grain: one current customer. Type 1 current-state dimension."
+    columns:
+      - name: customer_sk
+        description: "Deterministic surrogate key from customer_id."
+        tests: [not_null, unique]
+      - name: customer_id
+        tests: [not_null, unique]
+      - name: customer_status
+        tests: [{accepted_values: {values: [active, inactive, suspended]}}]
+  - name: dim_products
+    description: "Grain: one current product."
+    columns:
+      - name: product_sk
+        tests: [not_null, unique]
+      - name: product_id
+        tests: [not_null, unique]
+  - name: dim_locations
+    description: "Grain: one current location; intentionally not joined to orders."
+    columns:
+      - name: location_sk
+        tests: [not_null, unique]
+  - name: dim_date
+    description: "Grain: one observed business date."
+    columns:
+      - name: date_day
+        tests: [not_null, unique]
+  - name: fct_orders
+    description: "Grain: one current order; merge incremental with delete synchronization."
+    columns:
+      - name: order_id
+        tests: [not_null, unique]
+      - name: customer_sk
+        tests: [{relationships: {to: ref('dim_customers'), field: customer_sk}}]
+      - name: order_status
+        tests: [{accepted_values: {values: [created, completed, cancelled]}}]
+  - name: fct_payments
+    description: "Grain: one current payment."
+    columns:
+      - name: payment_id
+        tests: [not_null, unique]
+      - name: payment_status
+        tests: [{accepted_values: {values: [authorized, completed, failed, refunded]}}]
+  - name: mart_daily_sales
+    description: "Grain: one order date and source currency. Missing conversion stays visible."

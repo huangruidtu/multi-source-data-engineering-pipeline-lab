@@ -1,0 +1,14 @@
+name: mdep_analytics
+version: 1.0.0
+config-version: 2
+profile: mdep_analytics
+model-paths: [models]
+macro-paths: [macros]
+test-paths: [tests]
+snapshot-paths: [snapshots]
+clean-targets: [target, dbt_packages]
+models:
+  mdep_analytics:
+    staging: {materialized: view, schema: gold}
+    intermediate: {materialized: view, schema: gold}
+    marts: {materialized: table, schema: gold}
