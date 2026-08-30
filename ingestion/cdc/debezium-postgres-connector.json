@@ -17,6 +17,6 @@
     "table.include.list": "commerce.customers,commerce.products,commerce.orders,commerce.payments",
     "snapshot.mode": "initial",
     "tombstones.on.delete": "true",
-    "include.transaction": "true"
+    "provide.transaction.metadata": "true"
   }
 }

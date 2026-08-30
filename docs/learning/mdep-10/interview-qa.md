@@ -19,3 +19,9 @@
 ## Is Debezium exactly once and why does MDEP-10 stop at Kafka?
 
 **Direct answer:** treat delivery as at least once; failures around offsets/acks can duplicate records. MDEP-10 captures transport, while MDEP-11 owns idempotent current-state Silver application. **Project example:** pure helpers classify envelopes but write no Silver state. **Follow-up:** “Kafka down?” connector pauses/fails and slot lag can grow. **Senior extension:** monitor connector/Kafka/slot lag, capacity, retries, DLQ policy, and recovery drills.
+
+## How do you enable and use Debezium transaction metadata?
+
+**Direct answer:** For this Debezium 3.0 PostgreSQL connector I configure `provide.transaction.metadata=true`. PostgreSQL supplies commit boundaries; Debezium is expected to enrich data-change envelopes with transaction metadata and emit transaction boundary events where its event contract supports them.
+
+**Project example:** the connector JSON enables the setting and the validator performs two product updates inside one PostgreSQL transaction. This is configuration, not observed runtime evidence. **Likely follow-up:** “Does that provide global ordering?” No. Transaction metadata helps identify/order transaction-related records, while Kafka ordering remains only within each partition; records across multiple partitions have no global order. **Senior-level extension:** consume and validate the actual boundary/data event contract, retain source LSN/transaction identifiers for audit/idempotency, and design downstream state application for at-least-once delivery.
