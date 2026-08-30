@@ -17,6 +17,9 @@ The authoritative V1 completion boundary remains
 supplementary learning material; this directory is a code-first bridge between
 the repository and interview discussion.
 
+Start with the [Master Map](master-map.md) for an end-to-end reading route,
+interview-topic routes, and time-boxed study plans.
+
 ## Status labels
 
 | Label | Meaning |
