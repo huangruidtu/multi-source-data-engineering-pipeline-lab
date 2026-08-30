@@ -6,7 +6,7 @@ MDEP-8 implementation is merged in `main`, but MDEP-25, MDEP-28, and MDEP-8 rema
 
 ## Current merged-state constraint
 
-`main` contains PostgreSQL and REST Compose services, the batch modules, and the Airflow DAG. It does **not** contain an Airflow Compose service or `scripts/validate-mdep-8-runtime.ps1`. Jira previously referenced a follow-up branch commit containing those items, but that commit was not part of merged PR #4. A validation task must first use a compatible Airflow runtime or merge/recreate a reviewed runtime setup; it must not infer success from the Jira comment.
+PR #4 merged the batch implementation but omitted its later runtime setup. PR #5 restores that setup: the Compose file includes the Airflow service, `orchestration/airflow/Dockerfile` builds it, the DAG supports the Docker-network REST base URL, and `scripts/validate-mdep-8-runtime.ps1` automates the core checks. This makes the procedure available in the repository; no Docker/Airflow/PostgreSQL run has yet been evidenced.
 
 ## Prerequisites
 
@@ -18,21 +18,11 @@ MDEP-8 implementation is merged in `main`, but MDEP-25, MDEP-28, and MDEP-8 rema
 
 ## Exact source and local-Airflow commands
 
-Run from the repository root on a capable host:
+Run from the repository root on a Docker-capable host:
 
 ```powershell
-python -m pip install -r ingestion/batch/requirements.txt
 docker compose up --build --wait
-.\scripts\reset-sources.ps1
-$env:BRONZE_LOCAL_ROOT = "$PWD/build/local-object-store"
-$env:POSTGRES_DSN = 'postgresql://lab:lab@localhost:5432/commerce'
-$env:AIRFLOW_HOME = "$PWD/.airflow"
-$env:AIRFLOW__CORE__DAGS_FOLDER = "$PWD/orchestration/dags"
-airflow db migrate
-airflow dags list | Select-String mdep_bronze_ingestion
-airflow dags test mdep_bronze_ingestion 2025-02-01
-airflow dags test mdep_bronze_ingestion 2025-02-01
-airflow dags backfill mdep_bronze_ingestion -s 2025-02-01 -e 2025-02-02
+.\scripts\validate-mdep-8-runtime.ps1 -StartDate 2025-02-01 -EndDate 2025-02-02
 ```
 
 Stop sources after evidence is captured:

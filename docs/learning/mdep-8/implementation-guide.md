@@ -48,4 +48,4 @@ Local validation uses the same keys below `BRONZE_LOCAL_ROOT`; setting `BRONZE_S
 
 ## Merged-state validation boundary
 
-This implementation was merged before Docker/Airflow/PostgreSQL runtime acceptance was completed. The files on `main` implement the DAG and extraction units, but `main` does not currently include an Airflow Compose service or `scripts/validate-mdep-8-runtime.ps1`; those were described in a later branch commit but were not merged with PR #4. See the follow-up validation plan before treating the unexecuted runtime scenarios as complete.
+This implementation was merged before Docker/Airflow/PostgreSQL runtime acceptance was completed. PR #5 restores the previously omitted Airflow Compose service and `scripts/validate-mdep-8-runtime.ps1` from the MDEP-8 runtime setup. Their presence makes the validation procedure reproducible; it does not prove that the Docker/Airflow/PostgreSQL acceptance scenarios have run. See the follow-up validation plan before treating them as complete.
