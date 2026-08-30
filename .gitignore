@@ -203,6 +203,11 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# MDEP-13 runtime evidence is local, may contain operational output, and is never
+# committed. The README is the safe, versioned evidence contract.
+validation/evidence/*
+!validation/evidence/README.md
+
 # Ruff stuff:
 .ruff_cache/
 

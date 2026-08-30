@@ -1,0 +1,13 @@
+version: 1
+story: MDEP-13
+gates:
+  - {id: Q01, classification: BLOCKING, rule: Silver current-state business keys are unique, validation: duplicate-key reconciliation query}
+  - {id: Q02, classification: BLOCKING, rule: A stale event cannot overwrite a newer Silver version, validation: replay and ordering evidence}
+  - {id: Q03, classification: BLOCKING, rule: Required keys and required fields are non-null, validation: null-field reconciliation query}
+  - {id: Q04, classification: BLOCKING, rule: Batch rerun does not duplicate canonical Bronze output, validation: same-interval object/key comparison}
+  - {id: Q05, classification: BLOCKING, rule: dbt blocking tests pass before Gold promotion, validation: dbt test output}
+  - {id: Q06, classification: WARNING, rule: Missing exchange rates remain visible, validation: missing_dkk_rate count}
+  - {id: Q07, classification: WARNING, rule: Orphan payments are surfaced rather than discarded, validation: relationship warning and orphan query}
+  - {id: Q08, classification: WARNING, rule: Quarantine volume is reviewed, validation: quarantine count by reason}
+  - {id: Q09, classification: INFORMATIONAL, rule: Iceberg snapshot and file growth are recorded, validation: snapshot/file inventory}
+  - {id: Q10, classification: INFORMATIONAL, rule: Source freshness and processing lag are recorded, validation: freshness/lag timestamps}

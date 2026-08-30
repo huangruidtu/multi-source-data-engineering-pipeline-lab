@@ -1,0 +1,3 @@
+# Failure scenarios
+
+Use `validation/failure-scenarios.yml` as the executable checklist. The incident narrative is **detect → diagnose → handle → recover → validate**. Batch coverage includes PostgreSQL outage, REST throttling, malformed files, duplicate reruns, and stale Bronze replay. CDC coverage includes Debezium/Kafka/PostgreSQL restart, offset loss, duplicates, lower-LSN and transaction order, tombstones, and Flink checkpoint recovery. Lakehouse/Warehouse coverage includes Iceberg/S3 outage, schema evolution, stale Snowflake metadata, dbt test failure, missing exchange rate, and orphan payment. No scenario is reported as physically executed until run-specific evidence exists.

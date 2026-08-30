@@ -1,0 +1,70 @@
+version: 1
+story: MDEP-13
+status_vocabulary: [NOT_RUN, PASSED, FAILED, BLOCKED]
+items:
+  - id: M8-AIRFLOW-BATCH
+    story: MDEP-8
+    component: Airflow / PostgreSQL / REST / files
+    description: Start the local batch stack, run the Bronze DAG twice, backfill, and inspect Bronze and quarantine Parquet metadata.
+    command: scripts/validate-mdep-8-runtime.ps1 -StartDate 2025-02-01 -EndDate 2025-02-02
+    required_environment: Docker Desktop with Compose and available local ports
+    expected_result: DAG, rerun, backfill, Bronze metadata, and quarantine checks are evidenced.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/batch/
+    blocker: Docker is unavailable on the current host; no Airflow/PostgreSQL runtime evidence exists.
+    notes: Preserves MDEP-8, MDEP-25, and MDEP-28 runtime-validation debt.
+  - id: M9-SPARK-ICEBERG
+    story: MDEP-9
+    component: PySpark / Iceberg / Bronze-to-Silver
+    description: Transform Bronze to Silver, inspect snapshots, rerun, and prove stale replay does not regress current state.
+    command: scripts/run-mdep-9-silver.ps1 -BronzeRoot <uri> -Warehouse <uri> -Inspect
+    required_environment: Java, spark-submit, Iceberg runtime artifact, and Bronze input
+    expected_result: Silver tables have one current record per key and replay/version ordering evidence.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/silver/
+    blocker: Java, spark-submit, and a prepared Bronze runtime input are unavailable on the current host.
+    notes: Preserves MDEP-9 and MDEP-33 runtime-validation debt.
+  - id: M10-DEBEZIUM-KAFKA
+    story: MDEP-10
+    component: PostgreSQL WAL / Debezium / Kafka
+    description: Register the connector and observe snapshot, mutations, tombstones, schema evolution, and transaction metadata.
+    command: scripts/validate-mdep-10-cdc.ps1
+    required_environment: Docker Desktop with Compose
+    expected_result: Connector status, slot/publication, and topic evidence are captured.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/cdc/
+    blocker: Docker is unavailable on the current host.
+    notes: Configuration is implemented; transaction metadata observation is not claimed.
+  - id: M11-FLINK-CDC
+    story: MDEP-11
+    component: Flink / Kafka / Iceberg / S3
+    description: Submit the Flink CDC job and test current state, archive, checkpoint, replay, stale-event, and tombstone behavior.
+    command: scripts/validate-mdep-11-flink-cdc.ps1 -Bucket <bucket>
+    required_environment: Docker Desktop with Compose, writable S3 bucket, and AWS credentials
+    expected_result: Flink job, checkpoints, Bronze CDC archive, quarantine, and Iceberg evidence are captured.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/cdc/
+    blocker: Docker, AWS credentials, and writable S3 storage are unavailable on the current host.
+    notes: Preserves MDEP-11 runtime-validation debt.
+  - id: M12-SNOWFLAKE-DBT
+    story: MDEP-12
+    component: Snowflake / external Iceberg / dbt
+    description: Create external access, compile and run dbt, test freshness, reconcile Gold, and inspect incremental/rebuild behavior.
+    command: cd analytics/dbt; dbt deps; dbt debug; dbt parse; dbt compile; dbt run; dbt test; dbt source freshness
+    required_environment: dbt-snowflake, Snowflake credentials, object-store integration, and readable Iceberg metadata
+    expected_result: Gold model/test/freshness and reconciliation evidence are captured.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/gold/
+    blocker: dbt executable, Snowflake credentials, and Snowflake/object-store runtime are unavailable on the current host.
+    notes: Preserves MDEP-12 runtime-validation debt.
+  - id: M13-RECONCILIATION
+    story: MDEP-13
+    component: cross-layer reconciliation
+    description: Run source/Silver/Gold business-key and count reconciliation templates for one bounded run.
+    command: validation/reconciliation/README.md
+    required_environment: reachable source, Iceberg/Spark SQL, and Snowflake/dbt query contexts
+    expected_result: Counts, anti-joins, duplicate/null checks, and exceptions are recorded per run.
+    actual_status: BLOCKED
+    evidence_path: validation/evidence/<run-id>/reconciliation/
+    blocker: Cross-system runtime endpoints are unavailable on the current host.
+    notes: Templates are implemented; no cross-layer count is asserted.
