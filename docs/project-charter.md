@@ -6,6 +6,15 @@
 **Jira Project:** `Multi-Source Data Engineering Pipeline Lab`  
 **Jira Key:** `MDEP`
 
+> **V1 scope amendment — 2026-08-30:** Sections written before this amendment
+> described hands-on physical runtime validation as mandatory for important
+> Stories. That was the original learning intent and is retained as project
+> history. For the final MDEP V1 scope, full infrastructure runtime integration
+> is deferred to a separate hands-on lab / V1.x validation phase. The canonical
+> V1 completion model is **IMPLEMENTED**, **OFFLINE / STATICALLY VALIDATED**,
+> **DOCUMENTED / DESIGNED**, and **RUNTIME DEFERRED**. This is a formal scope
+> decision, not a claim that unexecuted infrastructure has passed.
+
 ---
 
 ## 1. Project Purpose
@@ -607,6 +616,14 @@ Validate
 
 ## 15. Hands-On Validation Rule
 
+### Historical rule superseded for final V1
+
+The runtime exercises below remain valuable learning-lab recipes and must not
+be rewritten as if they happened. They are no longer final V1 completion
+criteria. Physical execution of Airflow, Spark, Flink, Kafka, PostgreSQL CDC,
+S3, Snowflake, and dbt is **RUNTIME DEFERRED**. A future V1.x hands-on phase
+may execute them and retain evidence.
+
 Every Jira Story that introduces an important technology or concept must include a **HANDS-ON VALIDATION** section.
 
 ### Spark
@@ -727,6 +744,41 @@ Use explicit states where useful:
 - `PLANNED`
 - `IMPLEMENTED`
 - `VALIDATED`
+
+For final V1, use the following truth model consistently:
+
+- **IMPLEMENTED** — versioned code or configuration exists.
+- **OFFLINE / STATICALLY VALIDATED** — unit, fixture, contract, deterministic,
+  reconciliation, or source-inspection evidence exists without requiring a
+  physical infrastructure deployment.
+- **DOCUMENTED / DESIGNED** — an architecture decision, prerequisite, failure
+  behavior, or production improvement is specified but not executed.
+- **RUNTIME DEFERRED** — physical integration is intentionally outside V1
+  acceptance and must never be described as runtime-validated.
+
+### Final V1 scope amendment and acceptance model
+
+### Why this changed
+
+MDEP V1 is optimized for interview preparation and implementation depth rather
+than a local production-like deployment. The project can demonstrate data
+engineering judgment more honestly through complete code, deterministic offline
+tests, reconciliation logic, failure reasoning, documentation, and interview
+readiness than through an incomplete local infrastructure demonstration.
+
+### What changed
+
+Full infrastructure runtime integration moved from mandatory V1 acceptance to
+**RUNTIME DEFERRED**. This includes physical Airflow/Spark/Flink/Kafka/
+PostgreSQL CDC/S3/Snowflake/dbt execution and full end-to-end validation.
+
+### What did not change
+
+Architecture correctness, implementation and configuration quality, offline
+validation, reconciliation logic, failure/trade-off reasoning, documentation,
+and interview readiness remain mandatory V1 criteria. The target architecture,
+technology scope, canonical-writer rules, and prohibition on unsupported tool
+sprawl do not change.
 
 Expected documentation eventually includes:
 

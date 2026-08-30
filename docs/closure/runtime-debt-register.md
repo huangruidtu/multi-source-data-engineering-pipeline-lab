@@ -1,4 +1,8 @@
-# V1 runtime-debt register
+# V1 runtime-deferred register
+
+**Scope amendment — 2026-08-30:** these items no longer block final V1
+completion. They remain an honest list of unexecuted physical integration work
+for a future V1.x hands-on validation phase. No row is runtime-validated.
 
 | debt_id | Story/component | Validation not executed and blocker | Class | Evidence/action | Blocks implementation closure? |
 | --- | --- | --- | --- | --- |
