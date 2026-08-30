@@ -14,7 +14,7 @@ Each item carries id, story, component, command, required environment, expected 
 ## 4. Important symbols
 `NOT_RUN`, `PASSED`, `FAILED`, `BLOCKED`; M8 through M13 items; `<run-id>` evidence paths.
 ## 5. Execution flow
-A suitable future runtime lab executes its command, captures evidence, and changes status only when evidence supports it. Current items remain BLOCKED because required hosts/services/credentials were unavailable when the matrix was written.
+A suitable future runtime lab executes its command, captures evidence, and changes status only when evidence supports it. The matrix retains its historical `BLOCKED` statuses for runtime exercises that were not executable when the evidence plan was recorded; under the final V1 scope, those physical exercises are **MDEP RUNTIME DEFERRED**, not V1 blockers.
 ## 6. Function-by-function walkthrough
 This file has no functions. M8 defines DAG/rerun/backfill evidence; M9 Silver/replay proof; M10 connector/snapshot/tombstone/transaction observation; M11 Flink checkpoint/current-state proof; M12 dbt/Snowflake proof; M13 business-key/count reconciliation. Each names required environment and concrete blocker.
 ## 7. Critical code-block reasoning
