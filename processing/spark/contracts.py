@@ -7,7 +7,7 @@ the CDC-owned PostgreSQL current-state entities.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from json import dumps
@@ -17,6 +17,10 @@ from typing import Any
 BATCH_SILVER_ENTITIES = frozenset({"exchange_rates", "locations"})
 CDC_OWNED_ENTITIES = frozenset({"customers", "products", "orders", "payments"})
 COUNTRY_REGIONS = {"DK": "nordics", "NO": "nordics"}
+VERSION_FIELDS = {
+    "exchange_rates": ("retrieved_at", "source_extract_ts", "ingested_at", "record_hash"),
+    "locations": ("updated_at", "source_extract_ts", "ingested_at", "record_hash"),
+}
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,34 @@ def deterministic_silver_key(entity: str, record: dict[str, Any]) -> str:
 
 def canonical_record_hash(record: dict[str, Any]) -> str:
     return sha256(dumps(record, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def version_order_key(entity: str, record: dict[str, Any]) -> tuple[datetime, datetime, datetime, str]:
+    """Return the complete Silver freshness order for a valid batch record.
+
+    The business version is primary.  The two landing-evidence timestamps
+    resolve equally-versioned source records; the hash is only a stable final
+    tie-breaker.  It must never make an older business version appear newer.
+    """
+    if entity not in BATCH_SILVER_ENTITIES:
+        raise ValueError(f"{entity!r} is not a batch-owned MDEP-9 Silver entity")
+
+    def timestamp(field: str, *, nulls_last: bool = False) -> datetime:
+        value = record.get(field)
+        if value is None:
+            if nulls_last:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            raise ValueError(f"{field} is required for Silver version ordering")
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+    business, extracted, ingested, record_hash = VERSION_FIELDS[entity]
+    return timestamp(business), timestamp(extracted, nulls_last=True), timestamp(ingested), str(record.get(record_hash, ""))
+
+
+def incoming_is_newer(entity: str, incoming: dict[str, Any], existing: dict[str, Any]) -> bool:
+    """True only if the full documented version tuple is lexicographically newer."""
+    return version_order_key(entity, incoming) > version_order_key(entity, existing)
 
 
 def in_incremental_boundary(value: str | datetime | None, start: datetime, end: datetime) -> bool:

@@ -16,7 +16,7 @@ Expected output includes both entity valid/quarantine counts, formatted plans, p
 
 ## Inspect and replay
 
-Run the same command twice. The second execution should keep one logical row per natural key after the Iceberg merge. Inspect Bronze files, Quarantine output, and Iceberg metadata locally:
+Run the same command twice. The second execution should keep one logical row per natural key after the Iceberg merge; an exact replay is a no-op. Also replay an older row with a deliberately different payload/hash: it must not replace a target row whose `retrieved_at`/`updated_at` is newer. The merge compares business version first, then source-extract timestamp, ingestion timestamp, and only then hash. Inspect Bronze files, Quarantine output, and Iceberg metadata locally:
 
 ```powershell
 Get-ChildItem -Recurse build/mdep-8-bronze/bronze

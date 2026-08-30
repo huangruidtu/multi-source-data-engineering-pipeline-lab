@@ -22,6 +22,12 @@
 
 **Project example:** rate key is date/base/quote and location key is location ID. **Follow-up:** “Is that a watermark?” No—this is a bounded batch processing boundary; Flink event-time watermarks are later scope. **Senior extension:** persist a reconciled processing state/checkpoint and handle late arrivals by deliberately reprocessing an overlap.
 
+## How do you prevent a late or replayed old batch from overwriting newer Silver state?
+
+**Direct answer:** I compare the incoming record with the existing Silver record using a complete lexicographic version tuple, not merely a changed payload hash. Exchange rates use `retrieved_at`, then `source_extract_ts`, `ingested_at`, and finally `record_hash`; locations use `updated_at` followed by the same evidence fields. Only a greater tuple updates.
+
+**Project example:** a location already at `updated_at=2026-08-20` ignores a replay from `2026-07-01` even if its `record_hash` differs. An exact replay has an equal tuple and is a no-op. **Likely follow-up:** “Why include the hash?” It deterministically resolves a true timestamp tie but is never treated as freshness. **Senior-level extension:** define producer version semantics explicitly, retain audit history/snapshots, monitor rejected or stale-replay rates, and use an overlap/reconciliation policy for late batch arrivals.
+
 ## What are repartitioning and skew, and how would you diagnose them?
 
 **Direct answer:** repartition redistributes data with a shuffle; coalesce reduces partitions without necessarily redistributing. Skew is uneven key distribution that leaves one task much slower/larger.

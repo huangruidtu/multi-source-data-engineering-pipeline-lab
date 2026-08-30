@@ -22,7 +22,7 @@
 
 **Spark execution / shuffle:** “DataFrame transformations are lazy; dedup windows and group-bys are wide transformations and shuffle by key. I inspect the formatted plan and partition counts before optimizing.” **中文：**“窗口和聚合会 shuffle；先看计划和任务指标再优化。”
 
-**Dedup/idempotency:** “The latest business version wins; source/extract/ingest time and hash make ties deterministic. Merge-on-natural-key prevents a rerun from adding a logical duplicate.” **中文：**“业务版本优先，hash 保证平局可预测，merge 保证重跑幂等。”
+**Dedup/idempotency:** “I first deduplicate inside the incoming batch, then apply the identical version ordering against the existing Silver row. Business time wins first, extraction and ingestion evidence break ties, and hash is only the last tie-breaker—not a freshness signal. That means an old replay with different content cannot regress Silver, while an exact replay is a no-op.” **中文：**“我先在输入批次内去重，再用相同的版本顺序与现有 Silver 比较。业务时间优先，抽取和入库时间用于平局，hash 只是最后的平局规则，不代表更新更晚；旧数据即使内容不同也不能覆盖新状态，完全重放则不操作。”
 
 **Iceberg/schema evolution:** “Iceberg adds snapshots and manifest metadata beyond Parquet files. I demonstrate only an additive nullable field; destructive changes require a contract migration.” **中文：**“Iceberg 提供快照和 manifest；只演示向后兼容的新增字段。”
 

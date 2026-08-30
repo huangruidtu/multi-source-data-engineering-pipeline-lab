@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Iterable
 
 try:  # supports both `python -m` and the documented spark-submit file path
-    from processing.spark.contracts import BATCH_SILVER_ENTITIES, COUNTRY_REGIONS
+    from processing.spark.contracts import BATCH_SILVER_ENTITIES, COUNTRY_REGIONS, VERSION_FIELDS
 except ModuleNotFoundError:  # pragma: no cover - direct script invocation
-    from contracts import BATCH_SILVER_ENTITIES, COUNTRY_REGIONS
+    from contracts import BATCH_SILVER_ENTITIES, COUNTRY_REGIONS, VERSION_FIELDS
 
 
 CATALOG_NAME = "mdep"
@@ -164,11 +164,22 @@ def write_quarantine(rejected, root: str, entity: str) -> None:
 def merge_iceberg(spark, winners, entity: str) -> None:
     name = table_name(entity)
     keys = "t.rate_date = s.rate_date AND t.base_currency = s.base_currency AND t.quote_currency = s.quote_currency" if entity == "exchange_rates" else "t.location_id = s.location_id"
+    business_version, extracted, ingested, record_hash = VERSION_FIELDS[entity]
+    source_extract_s = f"COALESCE(s.{extracted}, TIMESTAMP '0001-01-01 00:00:00')"
+    source_extract_t = f"COALESCE(t.{extracted}, TIMESTAMP '0001-01-01 00:00:00')"
+    # This predicate deliberately mirrors the incoming-batch window ordering.
+    # A hash decides only an exact timestamp tie; it is never a freshness signal.
+    update_when_newer = f"""(
+      s.{business_version} > t.{business_version}
+      OR (s.{business_version} = t.{business_version} AND {source_extract_s} > {source_extract_t})
+      OR (s.{business_version} = t.{business_version} AND {source_extract_s} = {source_extract_t} AND s.{ingested} > t.{ingested})
+      OR (s.{business_version} = t.{business_version} AND {source_extract_s} = {source_extract_t} AND s.{ingested} = t.{ingested} AND s.{record_hash} > t.{record_hash})
+    )"""
     winners.createOrReplaceTempView("mdep_9_staged")
-    # A retry's identical natural key/hash has no matching update action; a changed newer version replaces it.
+    # Exact replays and older replays take no action, preserving newer Silver state.
     spark.sql(
         f"""MERGE INTO {name} t USING mdep_9_staged s ON {keys}
-        WHEN MATCHED AND (s.source_extract_ts >= t.source_extract_ts OR s.record_hash <> t.record_hash) THEN UPDATE SET *
+        WHEN MATCHED AND {update_when_newer} THEN UPDATE SET *
         WHEN NOT MATCHED THEN INSERT *"""
     )
 
