@@ -4,7 +4,7 @@ This is the final **interview-expression layer** for MDEP: a way to turn the imp
 
 - [2 / 5 / 15 minute explanations](project-explanation-2-5-15.md) — spoken interview practice.
 - [Expanded project explanation](project-explanation-expanded.md) — detailed project-specific understanding and a compact context document for discussing one concept with ChatGPT.
-- `follow-up-question-map.md` — future interviewer drill-down/navigation material; not part of this batch.
+- [Follow-up question map](follow-up-question-map.md) — interviewer drill-down/navigation.
 
 Recommended workflow:
 
@@ -18,3 +18,5 @@ Expanded understanding
 ```
 
 For code-first study, start with the [Code Deep-Dive Master Map](../code-deep-dive/master-map.md). For task-based practice, use the [Practical Training modules](../practical-training/README.md). Keep all claims within the project truth labels: **MDEP IMPLEMENTED**, **MDEP OFFLINE TESTED**, **MDEP RUNTIME DEFERRED**, and **GENERAL / PRODUCTION CONCEPT — NOT IMPLEMENTED**.
+
+The MDEP Interview Pack is complete.
