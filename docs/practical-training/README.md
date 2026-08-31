@@ -6,9 +6,9 @@ Reusable, source-grounded exercises for debugging, review, design, testing, and 
 
 ## Training workflow
 
-`Task file → learner attempt → solution review → training record`. Keep attempts in a dated copy of a [training-record template](training-records/README.md), not in canonical task or solution files.
+`Workbook → learner attempt → solution review → training record → repeat under interview time pressure`. Keep attempts in a dated copy of a [training-record template](training-records/README.md), not in canonical task or solution files. The [Module 08 incident record](training-records/08-end-to-end-incidents-session-template.md) uses incident-specific diagnosis, recovery, and proof fields.
 
-**Recommended order:** 01 → 04 → 05 → 02 → 06 → 07 → 08. For 30 minutes, do one CDC task, one Spark task, and one validation task. For 2 hours, complete 01, 04, 06, and 07. For full practice, complete every module and record missed invariants.
+**Complete practical-training set:** Modules 01–08 form the final practical-training path. **Recommended order:** 01 Batch/Bronze → 02 Spark Silver → 03 CDC Transport → 04 CDC Current-State → 05 Flink → 06 Snowflake/dbt → 07 Validation/Reconciliation → 08 End-to-End Incidents. For 30 minutes, do one CDC task, one Spark task, and one validation task. For 2 hours, complete 01, 04, 06, and 07. For full practice, complete every module and record missed invariants.
 
 Truth labels: **MDEP IMPLEMENTED** = source/config exists; **MDEP OFFLINE TESTED** = unit/static contract evidence; **MDEP RUNTIME DEFERRED** = physical execution not claimed; **GENERAL / PRODUCTION CONCEPT — NOT IMPLEMENTED** = discussion context only.
 
