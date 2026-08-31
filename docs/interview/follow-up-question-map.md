@@ -10,17 +10,17 @@ Use this after the [2 / 5 / 15 minute explanations](project-explanation-2-5-15.m
 | Q02 | Why batch plus CDC? | establishes architecture judgment |
 | Q05 | How is Bronze idempotent? | tests reliability fundamentals |
 | Q09 | How do you prevent stale Spark replay? | tests freshness correctness |
-| Q14 | Why a replication slot? | tests CDC operational knowledge |
-| Q18 | How does current-state ordering work? | core CDC semantics |
-| Q19 | What about a stale delete? | tests safety under replay |
-| Q23 | Why ValueState? | tests streaming-state understanding |
-| Q27 | Why one Silver writer? | tests ownership model |
-| Q30 | Why Snowflake and dbt? | tests analytics boundary |
-| Q32 | Why does merge not handle deletes? | tests dbt correctness |
-| Q35 | Testing versus reconciliation? | tests reliability maturity |
-| Q36 | Why are equal counts insufficient? | tests data reasoning |
-| Q40 | What remains runtime deferred? | tests truthful scope control |
-| Q42 | What would you do first in production? | tests prioritization |
+| Q13 | What are publication and replication slot? | tests CDC operational knowledge |
+| Q17 | How does version_decision work? | core CDC semantics |
+| Q18 | What happens to delete LSN 420 after update LSN 500? | tests safety under replay |
+| Q21 | Why ValueState instead of a Python dictionary? | tests streaming-state understanding |
+| Q25 | Why one Silver writer per dataset? | tests ownership model |
+| Q26 | Why Snowflake and dbt if Silver exists? | tests analytics boundary |
+| Q27 | Why does incremental merge not solve deletes? | tests dbt correctness |
+| Q30 | Testing versus reconciliation? | tests reliability maturity |
+| Q31 | Why are matching counts insufficient? | tests data reasoning |
+| Q36 | Why did you not run full E2E? | tests truthful scope control |
+| Q37 | What would you productionize first? | tests prioritization |
 
 ## 1. Project framing and architecture
 
