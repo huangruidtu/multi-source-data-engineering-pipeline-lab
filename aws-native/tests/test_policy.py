@@ -1,5 +1,4 @@
 import re
-import sys
 import unittest
 from pathlib import Path
 
@@ -90,25 +89,30 @@ class AwsNativePolicyTests(unittest.TestCase):
         for required in (
             'default     = false',
             'reserved_concurrent_executions = 2',
+            'memory_size                    = 1024',
+            'timeout                        = 300',
             'default     = 8',
             'condition     = var.redshift_max_capacity_rpus == 8',
             'default     = 25',
         ):
             self.assertIn(required, self.tf)
 
-    def test_lambda_handler_accepts_only_approved_prefixes(self):
-        sys.path.insert(0, str(AWS_ROOT / "lambda"))
-        try:
-            from bronze_dispatcher import handler
-
-            event = {"Records": [{"s3": {"bucket": {"name": "example"}, "object": {"key": "bronze%2Frest_api%2Flocations%2Fpart.parquet"}}}]}
-            result = handler(event, None)
-            self.assertEqual(1, result["accepted"])
-            self.assertEqual("bronze", result["routes"][0]["prefix"])
-            with self.assertRaises(ValueError):
-                handler({"Records": [{"s3": {"bucket": {"name": "example"}, "object": {"key": "iceberg/table/data.parquet"}}}]}, None)
-        finally:
-            sys.path.pop(0)
+    def test_ingestion_lambda_is_explicit_and_least_privilege(self):
+        identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
+        services = (TF_ROOT / "services.tf").read_text(encoding="utf-8")
+        lambda_policy = identity.split('data "aws_iam_policy_document" "lambda"', 1)[1].split(
+            'resource "aws_iam_role_policy" "lambda"', 1
+        )[0]
+        for prefix in ("/source/reference/*", "/bronze/*", "/quarantine/*"):
+            self.assertIn(prefix, lambda_policy)
+        self.assertIn('actions   = ["s3:PutObject"]', lambda_policy)
+        self.assertIn('actions   = ["secretsmanager:GetSecretValue"]', lambda_policy)
+        self.assertIn('variable = "kms:ViaService"', lambda_policy)
+        self.assertNotIn('"s3:*"', lambda_policy)
+        self.assertNotIn('resources = ["*"]', lambda_policy)
+        self.assertNotIn("aws_s3_bucket_notification", services)
+        self.assertNotIn("aws_lambda_permission", services)
+        self.assertIn("enable_ingestion_lambda ? 1 : 0", services)
 
 
 if __name__ == "__main__":

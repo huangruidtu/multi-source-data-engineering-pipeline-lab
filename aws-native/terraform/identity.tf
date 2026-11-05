@@ -64,11 +64,15 @@ data "aws_iam_policy_document" "lambda_assume" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name               = "${local.name_prefix}-bronze-dispatcher"
+  count = var.enable_ingestion_lambda ? 1 : 0
+
+  name               = "${local.name_prefix}-bronze-ingestion"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
 
 data "aws_iam_policy_document" "lambda" {
+  count = var.enable_ingestion_lambda ? 1 : 0
+
   statement {
     sid    = "WriteOwnLogGroup"
     effect = "Allow"
@@ -76,14 +80,65 @@ data "aws_iam_policy_document" "lambda" {
       "logs:CreateLogStream",
       "logs:PutLogEvents",
     ]
-    resources = ["${aws_cloudwatch_log_group.lambda.arn}:*"]
+    resources = ["${aws_cloudwatch_log_group.lambda[0].arn}:*"]
+  }
+
+  statement {
+    sid    = "ReadSourceAndVerifyOwnedObjects"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+    ]
+    resources = [
+      "${aws_s3_bucket.data.arn}/source/reference/*",
+      "${aws_s3_bucket.data.arn}/bronze/*",
+      "${aws_s3_bucket.data.arn}/quarantine/*",
+    ]
+  }
+
+  statement {
+    sid       = "ConditionallyPublishOwnedObjects"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.data.arn}/bronze/*", "${aws_s3_bucket.data.arn}/quarantine/*"]
+  }
+
+  statement {
+    sid    = "UseDataKeyViaS3"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+    ]
+    resources = [aws_kms_key.data.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.postgres_secret_arn == null ? [] : [var.postgres_secret_arn]
+    content {
+      sid       = "ReadPostgresConnectionSecret"
+      effect    = "Allow"
+      actions   = ["secretsmanager:GetSecretValue"]
+      resources = [statement.value]
+    }
   }
 }
 
 resource "aws_iam_role_policy" "lambda" {
-  name   = "write-own-logs"
-  role   = aws_iam_role.lambda.id
-  policy = data.aws_iam_policy_document.lambda.json
+  count = var.enable_ingestion_lambda ? 1 : 0
+
+  name   = "ingest-approved-bronze-sources"
+  role   = aws_iam_role.lambda[0].id
+  policy = data.aws_iam_policy_document.lambda[0].json
 }
 
 data "aws_iam_policy_document" "redshift_assume" {

@@ -47,5 +47,13 @@ resource "terraform_data" "guardrails" {
       condition     = !var.enable_redshift_serverless || var.budget_alert_email != null
       error_message = "Redshift requires budget_alert_email so paid capacity cannot be enabled without an alert recipient."
     }
+    precondition {
+      condition     = !var.enable_ingestion_lambda || (length(var.lambda_dependency_layer_arns) >= 1 && var.postgres_secret_arn != null && var.rest_exchange_rates_url != null && var.rest_locations_url != null)
+      error_message = "Ingestion Lambda requires a reviewed dependency layer, PostgreSQL secret ARN and both REST endpoints."
+    }
+    precondition {
+      condition     = !var.enable_ingestion_lambda || var.budget_alert_email != null
+      error_message = "Ingestion Lambda requires budget_alert_email before paid compute is enabled."
+    }
   }
 }
