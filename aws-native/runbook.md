@@ -19,9 +19,31 @@ results justify **OFFLINE TESTED**, not **AWS RUNTIME VERIFIED**.
    reviewed and budgeted.
 5. Run `terraform plan -refresh=false -lock=false` and review every resource.
 
-The repository workflow can perform the same no-refresh plan through GitHub
-OIDC after the plan role exists and repository variables
-`AWS_PLAN_ROLE_ARN` and `AWS_ACCOUNT_ID` are set. The role cannot apply.
+### Required GitHub environment protection
+
+Before dispatching the OIDC job, create the exact environment
+`aws-sandbox-plan` under repository **Settings > Environments** and configure:
+
+1. At least one required reviewer who is not the workflow initiator.
+2. **Prevent self-review** enabled.
+3. Deployment branches/tags set to **Selected branches and tags**, with exactly
+   one branch policy: `main`. Do not add tags or wildcard branch policies.
+4. Administrator bypass disabled where the repository plan exposes that
+   control.
+5. Environment variables `AWS_PLAN_ROLE_ARN` and `AWS_ACCOUNT_ID`, where the
+   account is exactly 12 digits and the role ARN belongs to that account.
+
+GitHub documents that environment jobs require their protection rules to pass
+before starting and that required reviewers and deployment-branch policies are
+independent controls: [Deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+The workflow also reads the environment and branch-policy APIs and fails before
+AWS credential configuration if the required reviewer/self-review or exact
+`main` policy is absent. Administrator bypass must still be checked in the UI
+because it is not exposed by that read response.
+
+The plan role trusts only the immutable environment subject documented in
+`README.md`; it does not trust branch, pull-request, or repository-wide wildcard
+subjects. The role can identify the approved account but cannot apply.
 
 ## Deployment boundary
 

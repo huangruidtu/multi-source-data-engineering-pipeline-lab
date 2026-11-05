@@ -1,3 +1,4 @@
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -5,6 +6,7 @@ from pathlib import Path
 
 AWS_ROOT = Path(__file__).resolve().parents[1]
 TF_ROOT = AWS_ROOT / "terraform"
+WORKFLOW = AWS_ROOT.parent / ".github" / "workflows" / "aws-native-terraform.yml"
 
 
 def terraform_text() -> str:
@@ -43,13 +45,46 @@ class AwsNativePolicyTests(unittest.TestCase):
         for verb in ("Create", "Delete", "Put", "Update", "Attach", "PassRole"):
             self.assertNotIn(verb, plan_policy)
 
-    def test_oidc_trust_is_repository_and_audience_scoped(self):
+    def test_oidc_trust_matches_actual_environment_job_and_immutable_repository(self):
         locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
         identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
-        self.assertIn('repo:${var.github_repository}:ref:refs/heads/main', locals_text)
-        self.assertIn('repo:${var.github_repository}:pull_request', locals_text)
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        oidc_job = workflow.split("  oidc-no-refresh-plan:", 1)[1]
+        environment = re.search(r"(?m)^    environment: ([a-z0-9-]+)$", oidc_job)
+        subject = re.search(r'github_oidc_subject\s*=\s*"([^"]+)"', locals_text)
+        self.assertIsNotNone(environment)
+        self.assertIsNotNone(subject)
+        rendered_subject = subject.group(1).replace("${local.github_environment}", environment.group(1))
+        self.assertEqual(
+            "repo:huangruidtu@45176295/multi-source-data-engineering-pipeline-lab@1350903098:environment:aws-sandbox-plan",
+            rendered_subject,
+        )
+        self.assertIn('github_environment  = "aws-sandbox-plan"', locals_text)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.run_aws_plan", oidc_job)
+        self.assertIn('environment_json="$(gh api', oidc_job)
+        self.assertIn('type == "required_reviewers" and .prevent_self_review == true', oidc_job)
+        self.assertIn('.total_count == 1 and .branch_policies[0].name == "main"', oidc_job)
         self.assertIn('variable = "token.actions.githubusercontent.com:aud"', identity)
         self.assertIn('values   = ["sts.amazonaws.com"]', identity)
+        self.assertRegex(
+            identity,
+            r'test\s*=\s*"StringEquals"\s+variable\s*=\s*"token\.actions\.githubusercontent\.com:sub"\s+values\s*=\s*\[local\.github_oidc_subject\]',
+        )
+        self.assertNotIn("ForAnyValue:StringLike", identity)
+        self.assertNotIn(":pull_request", locals_text)
+        self.assertNotIn(":ref:refs/heads/", locals_text)
+
+    def test_account_allow_list_and_redshift_budget_fail_closed(self):
+        variables = (TF_ROOT / "variables.tf").read_text(encoding="utf-8")
+        versions = (TF_ROOT / "versions.tf").read_text(encoding="utf-8")
+        locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
+        account_block = variables.split('variable "allowed_account_ids"', 1)[1].split('variable "create_github_oidc_provider"', 1)[0]
+        self.assertNotIn("default", account_block)
+        self.assertIn("length(var.allowed_account_ids) == 1", account_block)
+        self.assertIn("allowed_account_ids = var.allowed_account_ids", versions)
+        self.assertIn("contains(var.allowed_account_ids, data.aws_caller_identity.current.account_id)", locals_text)
+        self.assertNotIn("length(var.allowed_account_ids) == 0 ||", locals_text)
+        self.assertIn("!var.enable_redshift_serverless || var.budget_alert_email != null", locals_text)
 
     def test_expensive_services_are_bounded(self):
         for required in (

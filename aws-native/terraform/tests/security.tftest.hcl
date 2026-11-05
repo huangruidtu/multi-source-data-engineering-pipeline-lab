@@ -72,6 +72,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = local.github_oidc_subject == "repo:huangruidtu@45176295/multi-source-data-engineering-pipeline-lab@1350903098:environment:aws-sandbox-plan"
+    error_message = "OIDC trust must match the immutable repository IDs and exact plan environment."
+  }
+
+  assert {
     condition     = output.evidence_status.aws_runtime == "RUNTIME_DEFERRED"
     error_message = "Offline Terraform must not claim AWS runtime verification."
   }
@@ -81,7 +86,8 @@ run "rejects_unapproved_region" {
   command = plan
 
   variables {
-    aws_region = "us-east-1"
+    allowed_account_ids = ["123456789012"]
+    aws_region          = "us-east-1"
   }
 
   expect_failures = [var.aws_region]
@@ -91,7 +97,8 @@ run "rejects_oversized_budget" {
   command = plan
 
   variables {
-    monthly_budget_usd = 101
+    allowed_account_ids = ["123456789012"]
+    monthly_budget_usd  = 101
   }
 
   expect_failures = [var.monthly_budget_usd]
@@ -101,7 +108,32 @@ run "rejects_redshift_without_private_network_inputs" {
   command = plan
 
   variables {
+    allowed_account_ids        = ["123456789012"]
+    budget_alert_email         = "owner@example.com"
     enable_redshift_serverless = true
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "rejects_empty_account_allow_list" {
+  command = plan
+
+  variables {
+    allowed_account_ids = []
+  }
+
+  expect_failures = [var.allowed_account_ids]
+}
+
+run "rejects_redshift_without_budget_recipient" {
+  command = plan
+
+  variables {
+    allowed_account_ids         = ["123456789012"]
+    enable_redshift_serverless  = true
+    redshift_subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
+    redshift_security_group_ids = ["sg-11111111"]
   }
 
   expect_failures = [terraform_data.guardrails]

@@ -13,6 +13,11 @@ output "github_plan_role_arn" {
   value       = aws_iam_role.github_plan.arn
 }
 
+output "github_oidc_subject" {
+  description = "Exact immutable, environment-scoped GitHub OIDC subject trusted by AWS."
+  value       = local.github_oidc_subject
+}
+
 output "redshift_enabled" {
   description = "Whether the opt-in Redshift Serverless skeleton is planned."
   value       = var.enable_redshift_serverless

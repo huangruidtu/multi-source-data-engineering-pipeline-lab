@@ -39,9 +39,22 @@ Redshift service --assume role--> Redshift role
                                       `--decrypt via S3--> one KMS key
 ```
 
-The CI trust policy pins `aud` to AWS STS and `sub` to this repository's main
-branch or pull-request subject. The workflow grants `id-token: write` only to
-the optional OIDC plan job. Pull-request validation needs no AWS credentials.
+The CI trust policy pins `aud` to AWS STS and uses the one exact immutable,
+environment-scoped `sub` emitted for this post-2026-07-15 repository:
+
+```text
+repo:huangruidtu@45176295/multi-source-data-engineering-pipeline-lab@1350903098:environment:aws-sandbox-plan
+```
+
+This follows GitHub's current [OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc),
+which specifies immutable `owner@ID/repository@ID` segments for new repositories
+and an `environment` context when a job references an environment.
+
+The environment context replaces branch and pull-request contexts for that job.
+The workflow grants `id-token: write` only to the manual OIDC plan job and
+checks that the environment has a required reviewer with self-review disabled
+plus a single `main` deployment branch policy before requesting AWS
+credentials. Pull-request validation needs no AWS credentials.
 
 ## Service boundaries
 

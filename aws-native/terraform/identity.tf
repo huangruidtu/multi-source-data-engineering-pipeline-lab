@@ -23,9 +23,9 @@ data "aws_iam_policy_document" "github_assume" {
     }
 
     condition {
-      test     = "ForAnyValue:StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = local.github_subjects
+      values   = [local.github_oidc_subject]
     }
   }
 }

@@ -14,10 +14,11 @@ locals {
     CostCenter         = "interview-lab"
   }
 
-  github_subjects = [
-    "repo:${var.github_repository}:ref:refs/heads/main",
-    "repo:${var.github_repository}:pull_request",
-  ]
+  # This repository was created after GitHub's 2026-07-15 immutable-subject
+  # rollout. An environment job replaces branch/PR context with its exact
+  # environment context; owner and repository IDs prevent rename/reuse attacks.
+  github_environment  = "aws-sandbox-plan"
+  github_oidc_subject = "repo:huangruidtu@45176295/multi-source-data-engineering-pipeline-lab@1350903098:environment:${local.github_environment}"
 
   github_oidc_provider_arn = var.create_github_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : var.existing_github_oidc_provider_arn
   glue_database_name       = replace("${var.project_name}_${var.environment}_silver", "-", "_")
@@ -31,7 +32,7 @@ resource "terraform_data" "guardrails" {
 
   lifecycle {
     precondition {
-      condition     = length(var.allowed_account_ids) == 0 || contains(var.allowed_account_ids, data.aws_caller_identity.current.account_id)
+      condition     = contains(var.allowed_account_ids, data.aws_caller_identity.current.account_id)
       error_message = "Current AWS account is not in allowed_account_ids."
     }
     precondition {
@@ -41,6 +42,10 @@ resource "terraform_data" "guardrails" {
     precondition {
       condition     = !var.enable_redshift_serverless || (length(var.redshift_subnet_ids) >= 3 && length(var.redshift_security_group_ids) >= 1)
       error_message = "Redshift requires at least three reviewed private subnets and one security group."
+    }
+    precondition {
+      condition     = !var.enable_redshift_serverless || var.budget_alert_email != null
+      error_message = "Redshift requires budget_alert_email so paid capacity cannot be enabled without an alert recipient."
     }
   }
 }

@@ -31,24 +31,12 @@ variable "aws_region" {
 }
 
 variable "allowed_account_ids" {
-  description = "Exact AWS account allow-list. Set for every human-approved plan/apply."
+  description = "The one exact AWS account allowed for a human-approved plan/apply."
   type        = list(string)
-  default     = []
 
   validation {
-    condition     = alltrue([for id in var.allowed_account_ids : can(regex("^[0-9]{12}$", id))])
-    error_message = "Every allowed account ID must contain exactly 12 digits."
-  }
-}
-
-variable "github_repository" {
-  description = "GitHub owner/repository allowed to request the OIDC role."
-  type        = string
-  default     = "huangruidtu/multi-source-data-engineering-pipeline-lab"
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
-    error_message = "github_repository must use owner/repository format."
+    condition     = length(var.allowed_account_ids) == 1 && can(regex("^[0-9]{12}$", var.allowed_account_ids[0]))
+    error_message = "allowed_account_ids must contain exactly one approved 12-digit AWS account ID."
   }
 }
 

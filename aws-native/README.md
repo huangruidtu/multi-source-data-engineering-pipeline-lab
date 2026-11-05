@@ -63,9 +63,21 @@ terraform -chdir=aws-native/terraform plan -refresh=false -lock=false `
   -var='allowed_account_ids=["123456789012"]'
 ```
 
-Do not apply without human approval, an approved account ID, a reviewed plan,
-and a budget-alert address. Redshift is additionally opt-in and requires three
-private subnets plus security groups.
+`allowed_account_ids` has no default and accepts exactly one 12-digit ID. Both
+the AWS provider and a Terraform precondition enforce the same account. Do not
+apply without human approval, that explicit account ID and a reviewed plan.
+Redshift is additionally opt-in and requires three private subnets, a security
+group and a non-null budget-alert address.
+
+The manual OIDC job trusts only this immutable, environment-scoped subject:
+
+```text
+repo:huangruidtu@45176295/multi-source-data-engineering-pipeline-lab@1350903098:environment:aws-sandbox-plan
+```
+
+Configure the exact GitHub environment protections in `runbook.md` before
+running it. The workflow verifies the reviewer and `main` branch policies
+before requesting AWS credentials.
 
 ## Cleanup and cost controls
 
@@ -77,8 +89,8 @@ private subnets plus security groups.
 - Lambda uses 128 MB, a 30-second timeout, 14-day logs and reserved concurrency
   of two. It has no S3 permissions in AWS-01 because its code only validates and
   logs routing metadata.
-- Redshift Serverless is disabled by default, private-only when enabled, and
-  capped at eight RPUs by default.
+- Redshift Serverless is disabled by default, private-only when enabled, capped
+  at eight RPUs and blocked unless a budget-alert recipient is supplied.
 - AWS Budgets creates forecasted 80% and actual 100% email alerts when
   `budget_alert_email` is supplied. A budget is an alert, not a hard stop.
 
