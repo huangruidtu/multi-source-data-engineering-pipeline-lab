@@ -12,7 +12,7 @@
 | --- | --- |
 | Locked Python 3.12 environment | PASS; PyArrow 22.0.0, psycopg 3.3.8, boto3 1.43.124, Airflow 3.3.2 |
 | AWS-native Python suite | PASS: 40, SKIP: 1 native-Windows Airflow parse |
-| Ubuntu PR suite | PASS: 37, FAIL: 0, SKIP: 0; Airflow DAG parsed |
+| Ubuntu PR suite | PASS: 41, FAIL: 0, SKIP: 0; Airflow DAG parsed |
 | AWS-02 focused suite | PASS: 33, SKIP: 1 native-Windows Airflow parse |
 | Lambda source archive | PASS: 11 source files; required modules compile |
 | `terraform fmt -recursive` | PASS |
@@ -26,7 +26,7 @@
 
 The local Airflow skip is platform-specific: Apache Airflow supports POSIX
 rather than native Windows. The identical test passed without a skip in PR #32
-[Ubuntu run 42130307397](https://github.com/huangruidtu/multi-source-data-engineering-pipeline-lab/actions/runs/42130307397),
+[Ubuntu run 42131501986](https://github.com/huangruidtu/multi-source-data-engineering-pipeline-lab/actions/runs/42131501986),
 which installed the lock and imported the real DAG.
 
 ## Commands
