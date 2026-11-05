@@ -23,6 +23,7 @@ def context():
         date(2025, 2, 1),
         datetime(2025, 2, 1, tzinfo=timezone.utc),
         datetime(2025, 2, 2, tzinfo=timezone.utc),
+        datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
     )
 
 
@@ -39,7 +40,7 @@ def records(name="Copenhagen"):
             "source_entity": "locations",
             "source_record_key": "loc-1",
             "source_extract_ts": "2025-02-01T00:00:00Z",
-            "ingested_at": "2025-02-02T00:00:00Z",
+            "ingested_at": "2025-02-02T12:30:00Z",
             "source_version": None,
             "source_locator": "page=1",
             "record_hash": "a" * 64,
@@ -59,6 +60,13 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(Status.PUBLISHED, first.status)
             self.assertEqual(Status.ALREADY_PUBLISHED, second.status)
             self.assertEqual(1, len(publisher.list_committed()))
+
+    def test_parquet_preserves_optional_field_first_seen_in_second_record(self):
+        two_records = [records()[0], {**records("Aarhus")[0], "location_id": "loc-2", "optional_region_code": "DK-82"}]
+        round_trip = read_parquet(to_parquet(two_records).data)
+        self.assertIn("optional_region_code", round_trip[0])
+        self.assertIsNone(round_trip[0]["optional_region_code"])
+        self.assertEqual("DK-82", round_trip[1]["optional_region_code"])
 
     def test_changed_content_under_same_identity_is_conflict(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -124,15 +132,27 @@ class FakeClientError(Exception):
 
 
 class FakeS3Client:
-    def __init__(self):
+    def __init__(self, allowed_list_prefixes=("bronze/", "quarantine/")):
         self.objects = {}
         self.put_calls = []
+        self.list_calls = []
+        self.head_calls = []
         self.fail_put_code = None
+        self.allowed_list_prefixes = allowed_list_prefixes
+
+    def list_objects_v2(self, **kwargs):
+        self.list_calls.append(kwargs)
+        prefix = kwargs["Prefix"]
+        if not any(prefix.startswith(allowed) for allowed in self.allowed_list_prefixes):
+            raise FakeClientError("AccessDenied")
+        contents = [{"Key": key} for key in sorted(self.objects) if key.startswith(prefix)]
+        return {"Contents": contents[: kwargs.get("MaxKeys", 1000)]}
 
     def head_object(self, **kwargs):
+        self.head_calls.append(kwargs)
         key = kwargs["Key"]
         if key not in self.objects:
-            raise FakeClientError("404")
+            raise FakeClientError("AccessDenied")
         value = self.objects[key]
         return {"ContentLength": len(value), "Metadata": {"payload-sha256": sha256_hex(value)}}
 
@@ -153,6 +173,25 @@ class FakeS3Client:
 
 
 class S3AdapterTests(unittest.TestCase):
+    def test_first_publication_uses_prefix_scoped_exact_key_listing(self):
+        client = FakeS3Client()
+        publisher = BronzePublisher(S3ObjectStore("bucket", client=client, kms_key_id="key-arn"))
+        result = publisher.publish(context(), to_parquet(records()))
+        self.assertEqual(Status.PUBLISHED, result.status)
+        self.assertTrue(client.list_calls)
+        self.assertTrue(all(call["Prefix"].startswith("bronze/") for call in client.list_calls))
+        self.assertTrue(all(call["MaxKeys"] == 1 for call in client.list_calls))
+        self.assertEqual({context().data_key, context().manifest_key}, set(client.objects))
+
+    def test_missing_object_uses_exact_list_and_does_not_hide_access_denied(self):
+        client = FakeS3Client()
+        store = S3ObjectStore("bucket", client=client)
+        self.assertIsNone(store.head("bronze/rest_api/locations/missing.parquet"))
+        self.assertEqual([], client.head_calls)
+        self.assertEqual("bronze/rest_api/locations/missing.parquet", client.list_calls[0]["Prefix"])
+        with self.assertRaises(ObjectStoreFailure):
+            store.head("source/reference/not-listable.json")
+
     def test_boto3_calls_are_conditional_kms_encrypted_and_scoped(self):
         client = FakeS3Client()
         store = S3ObjectStore("bucket", client=client, prefix="lab", kms_key_id="key-arn")

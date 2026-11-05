@@ -18,7 +18,14 @@ from mdep_ingestion.serialization import read_parquet
 
 
 def ctx(source, entity):
-    return BatchContext(source, entity, date(2025, 2, 1), datetime(2025, 2, 1, tzinfo=timezone.utc), datetime(2025, 2, 2, tzinfo=timezone.utc))
+    return BatchContext(
+        source,
+        entity,
+        date(2025, 2, 1),
+        datetime(2025, 2, 1, tzinfo=timezone.utc),
+        datetime(2025, 2, 2, tzinfo=timezone.utc),
+        datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
+    )
 
 
 class OnePageClient:
@@ -110,6 +117,32 @@ class PipelineTests(unittest.TestCase):
         renamed = self.pipeline.file_bytes(ctx("csv_file", "product_categories"), filename="renamed.csv", content=content)
         self.assertEqual(Status.PUBLISHED, first.status)
         self.assertEqual(Status.ALREADY_PUBLISHED, renamed.status)
+
+    def test_historical_backfill_separates_interval_source_and_ingestion_times(self):
+        historical = BatchContext(
+            "rest_api",
+            "locations",
+            date(2020, 1, 1),
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            datetime(2020, 1, 2, tzinfo=timezone.utc),
+            datetime(2026, 11, 6, 10, 15, tzinfo=timezone.utc),
+        )
+        item = {
+            "location_id": "loc-old",
+            "location_name": "Historical",
+            "country_code": "DK",
+            "timezone": "Europe/Copenhagen",
+            "updated_at": "2020-01-01T08:00:00Z",
+        }
+        body = json.dumps({"items": [item], "next_page": None}).encode()
+        first = self.pipeline.rest(historical, url="https://example.test/locations", client=OnePageClient([HttpResponse(200, body, {})]))
+        retry = self.pipeline.rest(historical, url="https://example.test/locations", client=OnePageClient([HttpResponse(200, body, {})]))
+        landed = read_parquet(self.store.get_bytes(first.data_key))[0]
+        self.assertEqual(Status.PUBLISHED, first.status)
+        self.assertEqual(Status.ALREADY_PUBLISHED, retry.status)
+        self.assertEqual("2020-01-01T08:00:00Z", landed["source_extract_ts"])
+        self.assertEqual("2026-11-06T10:15:00Z", landed["ingested_at"])
+        self.assertEqual("2020-01-01", historical.logical_date.isoformat())
 
     def test_page_three_failure_has_no_canonical_publication(self):
         rate = {"rate_date": "2025-02-01", "base_currency": "EUR", "quote_currency": "DKK", "rate": 7.45, "retrieved_at": "2025-02-01T00:00:00Z"}

@@ -20,16 +20,19 @@ class IntervalResolutionTests(unittest.TestCase):
             logical_date=datetime(2025, 3, 5, tzinfo=timezone.utc),
             data_interval_start="2025-03-04T00:00:00Z",
             data_interval_end="2025-03-05T00:00:00Z",
+            ingested_at="2025-03-05T00:02:00Z",
         )
         context = run.context("rest_api", "locations")
         self.assertEqual("2025-03-05", context.logical_date.isoformat())
         self.assertEqual("2025-03-04T00:00:00+00:00", context.interval_start.isoformat())
+        self.assertEqual("2025-03-05T00:02:00+00:00", context.ingested_at.isoformat())
 
     def test_manual_backfill_overrides_interval_not_logical_date(self):
         run = resolve_run(
             logical_date="2025-04-20T09:00:00Z",
             data_interval_start="2025-04-20T09:00:00Z",
             data_interval_end="2025-04-20T09:00:01Z",
+            ingested_at="2025-04-20T09:01:30Z",
             backfill_start="2025-02-01T00:00:00Z",
             backfill_end="2025-02-03T00:00:00Z",
         )
@@ -42,6 +45,7 @@ class IntervalResolutionTests(unittest.TestCase):
             "logical_date": "2025-04-20",
             "data_interval_start": "2025-04-19T00:00:00Z",
             "data_interval_end": "2025-04-20T00:00:00Z",
+            "ingested_at": "2025-04-20T00:01:00Z",
         }
         with self.assertRaises(ValueError):
             resolve_run(**common, backfill_start="2025-02-01T00:00:00Z")

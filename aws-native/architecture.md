@@ -88,6 +88,7 @@ credentials. Pull-request validation needs no AWS credentials.
 | Compromised GitHub job | Subject/audience trust restriction and a role with no mutation permissions limit blast radius. |
 | Lambda retry storm | The function is absent by default; when enabled, reserved concurrency two and a 300-second timeout bound cost and data-plane writes. |
 | Source operation retry | The UUIDv5 run identity and conditional object writes make identical replay a verified no-op. |
+| Missing S3 object | The adapter lists the exact target key under an IAM-restricted Bronze/quarantine prefix before HEAD; a list 403 remains a failure, never a false absence. |
 | REST page 3 fails | Extraction finishes all pages before serialization; no canonical data or manifest is written. |
 | Data write succeeds, manifest fails | Data is an invisible orphan; identical retry verifies its checksum and publishes the manifest last. |
 | Redshift idle cost | Resource absent by default; when enabled, private networking and max-RPU cap apply. |
@@ -106,6 +107,17 @@ credentials. Pull-request validation needs no AWS credentials.
   tested locally there.
 - Lambda binary dependencies and approved PostgreSQL VPC routing are deployment
   inputs; neither is fabricated by AWS-02.
+
+## Time semantics
+
+- The logical `[interval_start, interval_end)` selects source data and remains
+  part of deterministic run identity.
+- `source_extract_ts` is the event/update/extraction time supplied by the
+  source record.
+- `ingested_at` is a real operational timestamp captured once when the Airflow
+  DAG run or explicit Lambda invocation begins. Retries reuse that value, so a
+  historical backfill remains truthful without changing Parquet bytes and
+  causing a false publication conflict.
 - Budget notifications are inactive until an email is deliberately supplied.
 - The OIDC provider is account-global; an account with an existing GitHub
   provider should set `create_github_oidc_provider=false` and pass its ARN.

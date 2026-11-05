@@ -107,12 +107,18 @@ class S3ObjectStore:
         return str(response.get("Error", {}).get("Code", "Unknown"))
 
     def head(self, key: str) -> ObjectInfo | None:
+        full_key = self._key(key)
         try:
-            response = self.client.head_object(Bucket=self.bucket, Key=self._key(key), ChecksumMode="ENABLED")
+            listed = self.client.list_objects_v2(Bucket=self.bucket, Prefix=full_key, MaxKeys=1)
         except Exception as error:
             code = self._code(error)
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                return None
+            raise ObjectStoreFailure(f"S3 existence check failed for {key}: {code}") from error
+        if not any(item.get("Key") == full_key for item in listed.get("Contents", [])):
+            return None
+        try:
+            response = self.client.head_object(Bucket=self.bucket, Key=full_key, ChecksumMode="ENABLED")
+        except Exception as error:
+            code = self._code(error)
             raise ObjectStoreFailure(f"S3 head failed for {key}: {code}") from error
         checksum = response.get("Metadata", {}).get("payload-sha256")
         return ObjectInfo(key, int(response.get("ContentLength", 0)), checksum)

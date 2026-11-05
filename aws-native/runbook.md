@@ -61,10 +61,12 @@ Never widen the plan role to make deployment convenient.
 
 The ingestion function has no S3 notification or Lambda permission resource.
 Invoke it explicitly with an orchestrator and one source operation containing
-`source_type`, `entity`, `logical_date`, `interval_start` and `interval_end`;
-file operations also require a `source/reference/` key. Do not label it runtime
-verified until an approved AWS smoke test proves the layer, networking, secret,
-source endpoints, KMS and S3 behavior.
+`source_type`, `entity`, `logical_date`, `interval_start`, `interval_end` and
+`ingested_at`; file operations also require a `source/reference/` key. Capture
+`ingested_at` once at orchestration-run start and reuse the identical event on
+retry. Do not derive it from `interval_end` and do not regenerate it per retry.
+Do not label the function runtime verified until an approved AWS smoke test
+proves the layer, networking, secret, source endpoints, KMS and S3 behavior.
 
 ## Cleanup
 

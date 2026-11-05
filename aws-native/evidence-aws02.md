@@ -11,9 +11,9 @@
 | Check | Observed result |
 | --- | --- |
 | Locked Python 3.12 environment | PASS; PyArrow 22.0.0, psycopg 3.3.8, boto3 1.43.124, Airflow 3.3.2 |
-| AWS-native Python suite | PASS: 36, SKIP: 1 native-Windows Airflow parse |
+| AWS-native Python suite | PASS: 40, SKIP: 1 native-Windows Airflow parse |
 | Ubuntu PR suite | PASS: 37, FAIL: 0, SKIP: 0; Airflow DAG parsed |
-| AWS-02 focused suite | PASS: 29, SKIP: 1 native-Windows Airflow parse |
+| AWS-02 focused suite | PASS: 33, SKIP: 1 native-Windows Airflow parse |
 | Lambda source archive | PASS: 11 source files; required modules compile |
 | `terraform fmt -recursive` | PASS |
 | `terraform init -backend=false -input=false` | PASS |

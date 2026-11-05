@@ -106,6 +106,9 @@ class AwsNativePolicyTests(unittest.TestCase):
         for prefix in ("/source/reference/*", "/bronze/*", "/quarantine/*"):
             self.assertIn(prefix, lambda_policy)
         self.assertIn('actions   = ["s3:PutObject"]', lambda_policy)
+        self.assertIn('actions   = ["s3:ListBucket"]', lambda_policy)
+        self.assertIn('variable = "s3:prefix"', lambda_policy)
+        self.assertIn('values   = ["bronze/*", "quarantine/*"]', lambda_policy)
         self.assertIn('actions   = ["secretsmanager:GetSecretValue"]', lambda_policy)
         self.assertIn('variable = "kms:ViaService"', lambda_policy)
         self.assertNotIn('"s3:*"', lambda_policy)

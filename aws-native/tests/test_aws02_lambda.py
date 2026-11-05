@@ -64,6 +64,7 @@ class LambdaAdapterTests(unittest.TestCase):
             "logical_date": "2025-02-01",
             "interval_start": "2025-02-01T00:00:00Z",
             "interval_end": "2025-02-02T00:00:00Z",
+            "ingested_at": "2025-02-02T12:30:00Z",
         }
 
     def test_rest_invocation_uses_configured_endpoint_and_shared_pipeline(self):

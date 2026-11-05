@@ -86,7 +86,7 @@ class BatchContext:
     logical_date: date
     interval_start: datetime
     interval_end: datetime
-    ingested_at: datetime | None = None
+    ingested_at: datetime
 
     def __post_init__(self) -> None:
         start = parse_utc(self.interval_start)
@@ -97,7 +97,7 @@ class BatchContext:
             raise ValueError("source_name and source_entity are required.")
         object.__setattr__(self, "interval_start", start)
         object.__setattr__(self, "interval_end", end)
-        object.__setattr__(self, "ingested_at", parse_utc(self.ingested_at or end))
+        object.__setattr__(self, "ingested_at", parse_utc(self.ingested_at))
 
     @classmethod
     def from_strings(
@@ -108,7 +108,7 @@ class BatchContext:
         logical_date: str,
         interval_start: str,
         interval_end: str,
-        ingested_at: str | None = None,
+        ingested_at: str,
     ) -> "BatchContext":
         return cls(
             source_name=source_name,
@@ -116,7 +116,7 @@ class BatchContext:
             logical_date=date.fromisoformat(logical_date[:10]),
             interval_start=parse_utc(interval_start),
             interval_end=parse_utc(interval_end),
-            ingested_at=parse_utc(ingested_at) if ingested_at else None,
+            ingested_at=parse_utc(ingested_at),
         )
 
     @property

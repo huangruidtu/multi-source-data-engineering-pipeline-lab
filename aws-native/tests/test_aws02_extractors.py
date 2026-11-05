@@ -20,6 +20,7 @@ def context(source_name="rest_api", entity="exchange_rates"):
         logical_date=date(2025, 2, 1),
         interval_start=datetime(2025, 2, 1, tzinfo=timezone.utc),
         interval_end=datetime(2025, 2, 2, tzinfo=timezone.utc),
+        ingested_at=datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
     )
 
 
@@ -60,17 +61,33 @@ class BatchContextTests(unittest.TestCase):
             logical_date=first.logical_date,
             interval_start=first.interval_start,
             interval_end=datetime(2025, 2, 3, tzinfo=timezone.utc),
+            ingested_at=first.ingested_at,
         )
         self.assertEqual(first.ingestion_id, retry.ingestion_id)
         self.assertNotEqual(first.ingestion_id, changed.ingestion_id)
         self.assertIn(first.ingestion_id, first.data_key)
-        self.assertEqual(first.interval_end, first.ingested_at)
+        self.assertNotEqual(first.interval_end, first.ingested_at)
+        self.assertEqual(datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc), first.ingested_at)
 
     def test_context_rejects_naive_or_empty_interval(self):
         with self.assertRaises(ValueError):
-            BatchContext("rest_api", "locations", date(2025, 2, 1), datetime(2025, 2, 1), datetime(2025, 2, 2))
+            BatchContext(
+                "rest_api",
+                "locations",
+                date(2025, 2, 1),
+                datetime(2025, 2, 1),
+                datetime(2025, 2, 2),
+                datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
+            )
         with self.assertRaises(ValueError):
-            BatchContext("rest_api", "locations", date(2025, 2, 1), datetime(2025, 2, 1, tzinfo=timezone.utc), datetime(2025, 2, 1, tzinfo=timezone.utc))
+            BatchContext(
+                "rest_api",
+                "locations",
+                date(2025, 2, 1),
+                datetime(2025, 2, 1, tzinfo=timezone.utc),
+                datetime(2025, 2, 1, tzinfo=timezone.utc),
+                datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
+            )
 
     def test_enrichment_preserves_business_fields_and_is_retry_stable(self):
         source = SourceRecord(RATE, "2025-02-01|EUR|DKK", RATE["retrieved_at"], '"v1"', "page=1#item=0")

@@ -105,6 +105,10 @@ before requesting AWS credentials.
   it is capped at 1,024 MB, 300 seconds, 1,024 MB ephemeral storage and reserved
   concurrency two. IAM is limited to `source/reference/`, `bronze/`,
   `quarantine/`, one KMS key, one log group and the exact PostgreSQL secret.
+- S3 existence checks issue `ListObjectsV2` with the complete object key and
+  `MaxKeys=1`; IAM permits listing only `bronze/*` and `quarantine/*`. This
+  yields an unambiguous missing-object result without treating AccessDenied as
+  absence or exposing unrelated bucket keys.
 - Redshift Serverless is disabled by default, private-only when enabled, capped
   at eight RPUs and blocked unless a budget-alert recipient is supplied.
 - AWS Budgets creates forecasted 80% and actual 100% email alerts when
@@ -114,6 +118,12 @@ See `runbook.md` before any approved deployment or cleanup.
 
 AWS-02 interview evidence is in `aws-02-interview.md`; exact offline results are
 in `evidence-aws02.md`.
+
+`interval_start`/`interval_end` describe source data, `source_extract_ts` comes
+from the source record, and `ingested_at` is an actual run-start timestamp
+captured once by the orchestrator and reused for task retries. Lambda callers
+must supply that stable `ingested_at`; it is intentionally not derived from the
+historical interval boundary.
 
 ## 30-60 second interview explanation
 

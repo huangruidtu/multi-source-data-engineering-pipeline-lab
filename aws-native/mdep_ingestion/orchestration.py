@@ -13,6 +13,7 @@ class ResolvedRun:
     logical_date: date
     interval_start: datetime
     interval_end: datetime
+    ingested_at: datetime
 
     def context(self, source_name: str, source_entity: str) -> BatchContext:
         return BatchContext(
@@ -21,6 +22,7 @@ class ResolvedRun:
             logical_date=self.logical_date,
             interval_start=self.interval_start,
             interval_end=self.interval_end,
+            ingested_at=self.ingested_at,
         )
 
 
@@ -37,6 +39,7 @@ def resolve_run(
     logical_date: str | date | datetime,
     data_interval_start: str | datetime,
     data_interval_end: str | datetime,
+    ingested_at: str | datetime,
     backfill_start: str | datetime | None = None,
     backfill_end: str | datetime | None = None,
 ) -> ResolvedRun:
@@ -48,4 +51,4 @@ def resolve_run(
     end = parse_utc(backfill_end or data_interval_end)
     if start >= end:
         raise ValueError("the target data interval must be non-empty and use [start, end) order")
-    return ResolvedRun(_logical_date(logical_date), start, end)
+    return ResolvedRun(_logical_date(logical_date), start, end, parse_utc(ingested_at))

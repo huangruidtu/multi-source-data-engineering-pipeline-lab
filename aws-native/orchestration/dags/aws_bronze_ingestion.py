@@ -21,10 +21,14 @@ from mdep_ingestion.runtime import compact_or_raise, pipeline_from_environment
 def _resolved_run():
     context = get_current_context()
     params = context["params"]
+    dag_started_at = context["dag_run"].start_date
+    if dag_started_at is None:
+        raise RuntimeError("Airflow dag_run.start_date is required as the stable ingestion timestamp")
     return resolve_run(
         logical_date=context["logical_date"],
         data_interval_start=context["data_interval_start"],
         data_interval_end=context["data_interval_end"],
+        ingested_at=dag_started_at,
         backfill_start=params.get("backfill_start"),
         backfill_end=params.get("backfill_end"),
     )

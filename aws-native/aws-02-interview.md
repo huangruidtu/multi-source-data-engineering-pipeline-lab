@@ -30,6 +30,10 @@
 The real commit boundary is the manifest, not a claim of multi-object S3
 atomicity.
 
+The timestamp fields are intentionally different: the interval selects logical
+source data, `source_extract_ts` belongs to the source record, and `ingested_at`
+is captured from the real orchestration run once and reused across retries.
+
 ## Likely follow-ups
 
 **How did you make ingestion idempotent?** The run UUID is derived from source,

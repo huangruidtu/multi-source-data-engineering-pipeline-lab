@@ -15,7 +15,8 @@ def to_parquet(records: list[dict[str, Any]]) -> PreparedPayload:
     except ImportError as error:  # pragma: no cover - dependency installation is mandatory in CI
         raise RuntimeError("PyArrow is required for the AWS-02 core Parquet path.") from error
     if records:
-        table = pa.Table.from_pylist(records)
+        field_names = list(dict.fromkeys(field for record in records for field in record))
+        table = pa.Table.from_pydict({field: [record.get(field) for record in records] for field in field_names})
     else:
         table = pa.table(
             {

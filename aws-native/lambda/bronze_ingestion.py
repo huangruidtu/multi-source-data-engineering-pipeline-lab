@@ -36,6 +36,7 @@ def _context(event: dict[str, Any], source_type: str, entity: str) -> BatchConte
             logical_date=str(event["logical_date"]),
             interval_start=str(event["interval_start"]),
             interval_end=str(event["interval_end"]),
+            ingested_at=str(event["ingested_at"]),
         )
     except KeyError as error:
         raise ValueError(f"missing invocation field: {error.args[0]}") from error
