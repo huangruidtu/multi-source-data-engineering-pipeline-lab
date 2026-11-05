@@ -1,0 +1,76 @@
+name: AWS-native Terraform validation
+
+on:
+  pull_request:
+    paths:
+      - "aws-native/**"
+      - ".github/workflows/aws-native-terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "aws-native/**"
+      - ".github/workflows/aws-native-terraform.yml"
+  workflow_dispatch:
+    inputs:
+      run_aws_plan:
+        description: "Run the OIDC no-refresh plan (requires repository variables)"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: aws-native-terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-validation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: aws-native/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - run: terraform test -no-color
+      - name: Run Python policy tests
+        working-directory: .
+        run: python -m unittest discover -s aws-native/tests -v
+
+  oidc-no-refresh-plan:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_aws_plan && vars.AWS_PLAN_ROLE_ARN != '' && vars.AWS_ACCOUNT_ID != '' }}
+    needs: offline-validation
+    runs-on: ubuntu-latest
+    environment: aws-sandbox-plan
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: aws-native/terraform
+    env:
+      AWS_REGION: eu-west-1
+      TF_VAR_aws_region: eu-west-1
+      TF_VAR_allowed_account_ids: '["${{ vars.AWS_ACCOUNT_ID }}"]'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.6
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          role-session-name: mdep-aws01-plan
+      - run: terraform init -backend=false -input=false
+      - run: terraform plan -refresh=false -lock=false -input=false -out=aws01.tfplan
