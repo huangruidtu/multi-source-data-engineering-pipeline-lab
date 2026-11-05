@@ -108,4 +108,4 @@ def aws_bronze_ingestion():
     completion_summary(postgres_snapshot(), rest_reference(), file_reference())
 
 
-aws_bronze_ingestion()
+dag = aws_bronze_ingestion()

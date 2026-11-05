@@ -57,7 +57,7 @@ class AirflowDagTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         assert spec.loader
         spec.loader.exec_module(module)
-        dag = module.aws_bronze_ingestion
+        dag = module.dag
         self.assertEqual("0 3 * * *", dag.schedule)
         self.assertEqual(1, dag.max_active_runs)
         self.assertEqual(
