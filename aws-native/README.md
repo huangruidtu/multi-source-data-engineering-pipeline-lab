@@ -13,7 +13,7 @@ the original MDEP V1 implementation or its runtime claims.
 | Architecture and contract mapping | CODED | `architecture.md`, `decisions/` |
 | PostgreSQL, REST, CSV/JSON ingestion | OFFLINE TESTED | `mdep_ingestion/`, `tests/test_aws02_*` |
 | Real Parquet and manifest-last publication | OFFLINE TESTED | `serialization.py`, `publication.py` |
-| Airflow data-interval orchestration | CI REQUIRED | `orchestration/dags/`, offline workflow |
+| Airflow data-interval orchestration | LINUX CI TESTED | `orchestration/dags/`, offline workflow |
 | Thin ingestion Lambda | CODED, opt-in | `lambda/bronze_ingestion.py`; binary layer and networking are deployment gates |
 | S3, KMS, IAM, Lambda and Glue Catalog | CODED | `terraform/` |
 | Redshift Serverless skeleton | CODED, opt-in | `enable_redshift_serverless=false` by default |

@@ -35,7 +35,7 @@ output "evidence_status" {
     ingestion        = "CODED"
     terraform        = "CODED"
     validation       = "OFFLINE_TESTED"
-    airflow_linux_ci = "CI_REQUIRED"
+    airflow_linux_ci = "OFFLINE_CI_TESTED"
     aws_runtime      = "RUNTIME_DEFERRED"
   }
 }
