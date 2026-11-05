@@ -7,7 +7,8 @@
 ```
 
 Expected evidence is a successful format check, provider-backed configuration
-validation, mocked Terraform policy assertions and Python policy tests. These
+validation, mocked Terraform policy assertions, locked ingestion tests, package
+validation and V1 regressions. These
 results justify **OFFLINE TESTED**, not **AWS RUNTIME VERIFIED**.
 
 ## Human-approved plan (read-only)
@@ -17,7 +18,14 @@ results justify **OFFLINE TESTED**, not **AWS RUNTIME VERIFIED**.
 3. Supply `budget_alert_email`; inspect spam and subscription requirements.
 4. Leave Redshift disabled unless private subnet and security-group IDs are
    reviewed and budgeted.
-5. Run `terraform plan -refresh=false -lock=false` and review every resource.
+5. Leave `enable_ingestion_lambda=false` unless the versioned Python 3.12 layer
+   contains compatible PyArrow and psycopg binaries, both REST HTTPS endpoints
+   and the exact PostgreSQL secret ARN are approved, and a budget recipient is
+   configured.
+6. PostgreSQL Lambda execution additionally requires approved connectivity to
+   the database. AWS-02 does not invent a VPC, subnets, security groups, NAT or
+   endpoints; add reviewed networking in a separate approved change.
+7. Run `terraform plan -refresh=false -lock=false` and review every resource.
 
 ### Required GitHub environment protection
 
@@ -50,6 +58,13 @@ subjects. The role can identify the approved account but cannot apply.
 There is intentionally no deploy job. An operator must add temporary authority
 outside this repository and obtain explicit approval before `terraform apply`.
 Never widen the plan role to make deployment convenient.
+
+The ingestion function has no S3 notification or Lambda permission resource.
+Invoke it explicitly with an orchestrator and one source operation containing
+`source_type`, `entity`, `logical_date`, `interval_start` and `interval_end`;
+file operations also require a `source/reference/` key. Do not label it runtime
+verified until an approved AWS smoke test proves the layer, networking, secret,
+source endpoints, KMS and S3 behavior.
 
 ## Cleanup
 

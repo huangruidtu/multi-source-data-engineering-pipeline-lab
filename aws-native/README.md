@@ -1,8 +1,9 @@
-# AWS-native MDEP (AWS-01)
+# AWS-native MDEP (AWS-01 and AWS-02)
 
 This directory is the isolated AWS-native variant approved by
 [MDEP-66](https://ruiproject.atlassian.net/browse/MDEP-66) and
-[MDEP-67](https://ruiproject.atlassian.net/browse/MDEP-67). It does not change
+[MDEP-67](https://ruiproject.atlassian.net/browse/MDEP-67) and
+[MDEP-68](https://ruiproject.atlassian.net/browse/MDEP-68). It does not change
 the original MDEP V1 implementation or its runtime claims.
 
 ## Evidence status
@@ -10,11 +11,15 @@ the original MDEP V1 implementation or its runtime claims.
 | Capability | Status | Evidence |
 | --- | --- | --- |
 | Architecture and contract mapping | CODED | `architecture.md`, `decisions/` |
+| PostgreSQL, REST, CSV/JSON ingestion | OFFLINE TESTED | `mdep_ingestion/`, `tests/test_aws02_*` |
+| Real Parquet and manifest-last publication | OFFLINE TESTED | `serialization.py`, `publication.py` |
+| Airflow data-interval orchestration | CI REQUIRED | `orchestration/dags/`, offline workflow |
+| Thin ingestion Lambda | CODED, opt-in | `lambda/bronze_ingestion.py`; binary layer and networking are deployment gates |
 | S3, KMS, IAM, Lambda and Glue Catalog | CODED | `terraform/` |
 | Redshift Serverless skeleton | CODED, opt-in | `enable_redshift_serverless=false` by default |
 | GitHub OIDC validation/plan workflow | CODED | `.github/workflows/aws-native-terraform.yml` |
 | Terraform format, validation and policy tests | OFFLINE TESTED | `scripts/validate.ps1`, `terraform/tests/`, `tests/` |
-| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 |
+| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 or AWS-02 |
 
 The captured local result is in `evidence.md`.
 
@@ -27,9 +32,11 @@ canonical-writer rules remain those in
 ```text
 PostgreSQL / REST / CSV / JSON
               |
-        future ingestion
+    shared AWS-02 ingestion
               v
-S3 bronze/<source>/<entity>/...  ---> S3 quarantine/... (invalid evidence)
+S3 data.parquet --manifest last--> S3 _COMMITTED.json
+              |
+              `--------------------> S3 quarantine/... (invalid evidence)
               |
        future Glue Spark
               v
@@ -40,20 +47,27 @@ S3 Iceberg + Glue Data Catalog (Silver)
         dbt-owned Gold
 ```
 
-AWS-01 provisions only the secure platform skeleton. Ingestion, Glue jobs,
-Iceberg tables and dbt models belong to later sprint stories.
+AWS-02 adds executable Bronze ingestion only. Glue jobs, Iceberg tables and dbt
+models remain later sprint stories; a PostgreSQL snapshot is replay/backfill
+evidence and is not a second canonical CDC Silver writer.
+
+The implementation deliberately buffers one source operation so nothing is
+published after a partial REST traversal. Defaults cap PostgreSQL at 100,000
+records, REST/files at 50,000 records, REST at 100 pages, and Lambda source
+objects at 10 MiB. Larger production feeds need streaming/multipart staging or
+a service with more runtime/disk; those changes are outside AWS-02.
 
 ## Offline validation
 
-Prerequisites: Terraform 1.9+ and Python 3.11+.
+Prerequisites: Terraform 1.9+, uv and Python 3.12.
 
 ```powershell
 ./aws-native/scripts/validate.ps1
 ```
 
-The script runs only local/static operations: `terraform fmt -check`,
-`terraform init -backend=false`, `terraform validate`, mocked Terraform tests,
-and Python policy tests. It never runs `terraform apply`.
+The script creates the locked Python environment and runs real PyArrow tests,
+Lambda package validation, the AWS-native tests, Terraform checks and all V1
+regressions. It never runs `terraform apply`.
 
 To inspect a no-refresh plan locally with AWS credentials already configured:
 
@@ -86,15 +100,20 @@ before requesting AWS credentials.
   blocked in two places (`force_destroy=false` and `prevent_destroy=true`).
 - Bronze and quarantine have bounded retention; Iceberg is intentionally not
   expired by an object lifecycle rule because table metadata owns cleanup.
-- Lambda uses 128 MB, a 30-second timeout, 14-day logs and reserved concurrency
-  of two. It has no S3 permissions in AWS-01 because its code only validates and
-  logs routing metadata.
+- The ingestion Lambda is absent by default. Enabling it requires an alert
+  recipient, exact source settings and a reviewed Python 3.12 dependency layer;
+  it is capped at 1,024 MB, 300 seconds, 1,024 MB ephemeral storage and reserved
+  concurrency two. IAM is limited to `source/reference/`, `bronze/`,
+  `quarantine/`, one KMS key, one log group and the exact PostgreSQL secret.
 - Redshift Serverless is disabled by default, private-only when enabled, capped
   at eight RPUs and blocked unless a budget-alert recipient is supplied.
 - AWS Budgets creates forecasted 80% and actual 100% email alerts when
   `budget_alert_email` is supplied. A budget is an alert, not a hard stop.
 
 See `runbook.md` before any approved deployment or cleanup.
+
+AWS-02 interview evidence is in `aws-02-interview.md`; exact offline results are
+in `evidence-aws02.md`.
 
 ## 30-60 second interview explanation
 
