@@ -154,6 +154,126 @@ resource "aws_iam_role_policy" "lambda" {
   policy = data.aws_iam_policy_document.lambda[0].json
 }
 
+data "aws_iam_policy_document" "glue_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["glue.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "glue_silver" {
+  count = var.enable_glue_silver_job ? 1 : 0
+
+  name               = "${local.name_prefix}-glue-silver"
+  assume_role_policy = data.aws_iam_policy_document.glue_assume.json
+
+  tags = { JiraStory = "MDEP-69" }
+}
+
+data "aws_iam_policy_document" "glue_silver" {
+  count = var.enable_glue_silver_job ? 1 : 0
+
+  statement {
+    sid       = "ListOnlySilverJobPrefixes"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.data.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["bronze/*", "iceberg/*", "scripts/aws03/*"]
+    }
+  }
+
+  statement {
+    sid       = "ListMultipartUploadsInDataBucket"
+    effect    = "Allow"
+    actions   = ["s3:ListBucketMultipartUploads"]
+    resources = [aws_s3_bucket.data.arn]
+  }
+
+  statement {
+    sid       = "ReadCommittedBronzeAndOwnCode"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:GetObjectVersion"]
+    resources = ["${aws_s3_bucket.data.arn}/bronze/*", "${aws_s3_bucket.data.arn}/scripts/aws03/*"]
+  }
+
+  statement {
+    sid    = "ManageOnlyIcebergSilverObjects"
+    effect = "Allow"
+    actions = [
+      "s3:AbortMultipartUpload",
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:ListMultipartUploadParts",
+      "s3:PutObject",
+    ]
+    resources = ["${aws_s3_bucket.data.arn}/iceberg/*"]
+  }
+
+  statement {
+    sid    = "ManageOnlySilverCatalog"
+    effect = "Allow"
+    actions = [
+      "glue:CreateTable",
+      "glue:DeleteTable",
+      "glue:GetDatabase",
+      "glue:GetDatabases",
+      "glue:GetPartition",
+      "glue:GetPartitions",
+      "glue:GetTable",
+      "glue:GetTables",
+      "glue:UpdateTable",
+    ]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:catalog",
+      "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/${aws_glue_catalog_database.silver.name}",
+      "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${aws_glue_catalog_database.silver.name}/*",
+    ]
+  }
+
+  statement {
+    sid    = "UseDataKeyOnlyThroughS3"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+    ]
+    resources = [aws_kms_key.data.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid       = "WriteOnlyOwnGlueLogs"
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.glue_silver[0].arn}:*"]
+  }
+}
+
+resource "aws_iam_role_policy" "glue_silver" {
+  count = var.enable_glue_silver_job ? 1 : 0
+
+  name   = "verified-bronze-to-iceberg-silver"
+  role   = aws_iam_role.glue_silver[0].id
+  policy = data.aws_iam_policy_document.glue_silver[0].json
+}
+
 data "aws_iam_policy_document" "redshift_assume" {
   statement {
     effect  = "Allow"

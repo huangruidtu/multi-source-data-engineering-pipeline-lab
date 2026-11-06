@@ -79,29 +79,43 @@ class RealIcebergPipelineTests(unittest.TestCase):
         self.assertEqual(3, self.spark.table("local.mdep_silver.silver_quarantine").count())
         self.assertEqual(1, self.spark.table("local.mdep_silver.processing_reconciliation").count())
 
-        newer = publish(self.store, batch_context("exchange_rates", 2), [{
-            "rate_date": "2026-11-01", "base_currency": "EUR", "quote_currency": "DKK", "rate": "7.4700000003",
+        newer = publish(self.store, batch_context("exchange_rates", 2), [
+            {
+                "rate_date": "2026-11-01", "base_currency": "EUR", "quote_currency": "DKK", "rate": "7.4700000003",
+                "retrieved_at": "2026-11-02T06:00:00Z",
+            },
+            {
+                "rate_date": "2026-11-01", "base_currency": "EUR", "quote_currency": "USD", "rate": "1.0800000000",
+                "retrieved_at": "2026-11-02T06:00:00Z",
+            },
+        ])
+        updated = process_verified_batch(self.spark, newer, self.data_path(newer))
+        self.assertEqual((1, 1, 0), (updated.inserted_count, updated.updated_count, updated.unchanged_count))
+
+        equal_version_conflict = publish(self.store, batch_context("exchange_rates", 3), [{
+            "rate_date": "2026-11-01", "base_currency": "EUR", "quote_currency": "DKK", "rate": "7.4800000004",
             "retrieved_at": "2026-11-02T06:00:00Z",
         }])
-        updated = process_verified_batch(self.spark, newer, self.data_path(newer))
-        self.assertEqual((0, 1, 0), (updated.inserted_count, updated.updated_count, updated.unchanged_count))
+        equal_result = process_verified_batch(self.spark, equal_version_conflict, self.data_path(equal_version_conflict))
+        self.assertEqual((0, 1, 0), (equal_result.inserted_count, equal_result.updated_count, equal_result.unchanged_count))
 
-        stale = publish(self.store, batch_context("exchange_rates", 3), [{
+        stale = publish(self.store, batch_context("exchange_rates", 4), [{
             "rate_date": "2026-11-01", "base_currency": "EUR", "quote_currency": "DKK", "rate": "9.9999999999",
             "retrieved_at": "2026-10-31T06:00:00Z",
         }])
         stale_result = process_verified_batch(self.spark, stale, self.data_path(stale))
         self.assertEqual((0, 0, 1), (stale_result.inserted_count, stale_result.updated_count, stale_result.unchanged_count))
-        final_rate = self.spark.sql("SELECT CAST(rate AS STRING) rate FROM local.mdep_silver.ref_exchange_rates").first()["rate"]
-        self.assertEqual("7.4700000003", final_rate)
+        final_rate = self.spark.sql("SELECT CAST(rate AS STRING) rate FROM local.mdep_silver.ref_exchange_rates WHERE quote_currency = 'DKK'").first()["rate"]
+        self.assertEqual("7.4800000004", final_rate)
+        self.assertEqual(2, self.spark.table("local.mdep_silver.ref_exchange_rates").count())
 
         snapshots = self.spark.sql("SELECT operation FROM local.mdep_silver.ref_exchange_rates.snapshots").collect()
         self.assertGreaterEqual(len(snapshots), 2)
         self.assertTrue(all(row["operation"] in {"append", "overwrite"} for row in snapshots))
 
-        locations = publish(self.store, batch_context("locations", 4), [
-            {"location_id": "loc-1", "location_name": "Copenhagen", "country_code": "DK", "timezone": "Europe/Copenhagen", "updated_at": "2026-11-04T08:00:00Z", "location_type": "hub"},
-            {"location_id": "loc-x", "location_name": "Unknown", "country_code": "XX", "timezone": "Etc/UTC", "updated_at": "2026-11-04T08:00:00Z"},
+        locations = publish(self.store, batch_context("locations", 5), [
+            {"location_id": "loc-1", "location_name": "Copenhagen", "country_code": "DK", "timezone": "Europe/Copenhagen", "updated_at": "2026-11-05T08:00:00Z", "location_type": "hub"},
+            {"location_id": "loc-x", "location_name": "Unknown", "country_code": "XX", "timezone": "Etc/UTC", "updated_at": "2026-11-05T08:00:00Z"},
         ])
         calls = []
 

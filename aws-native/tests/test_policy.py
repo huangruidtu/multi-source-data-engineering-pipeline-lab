@@ -117,6 +117,29 @@ class AwsNativePolicyTests(unittest.TestCase):
         self.assertNotIn("aws_lambda_permission", services)
         self.assertIn("enable_ingestion_lambda ? 1 : 0", services)
 
+    def test_glue_silver_is_pinned_cost_gated_and_least_privilege(self):
+        identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
+        glue = (TF_ROOT / "glue.tf").read_text(encoding="utf-8")
+        locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
+        policy = identity.split('data "aws_iam_policy_document" "glue_silver"', 1)[1].split(
+            'resource "aws_iam_role_policy" "glue_silver"', 1
+        )[0]
+        self.assertIn('glue_version      = "5.1"', glue)
+        self.assertIn('worker_type       = "G.1X"', glue)
+        self.assertIn('max_retries       = 0', glue)
+        self.assertIn('max_concurrent_runs = 1', glue)
+        self.assertIn('"--datalake-formats"', glue)
+        self.assertIn("org.apache.iceberg.aws.glue.GlueCatalog", glue)
+        self.assertIn("org.apache.iceberg.aws.s3.S3FileIO", glue)
+        self.assertIn("!var.enable_glue_silver_job || var.budget_alert_email != null", locals_text)
+        for prefix in ('"bronze/*"', '"iceberg/*"', '"scripts/aws03/*"'):
+            self.assertIn(prefix, policy)
+        self.assertIn('variable = "s3:prefix"', policy)
+        self.assertIn('variable = "kms:ViaService"', policy)
+        self.assertNotIn('actions   = ["s3:*"]', policy)
+        self.assertNotIn('actions   = ["glue:*"]', policy)
+        self.assertNotIn('resources = ["*"]', policy)
+
 
 if __name__ == "__main__":
     unittest.main()

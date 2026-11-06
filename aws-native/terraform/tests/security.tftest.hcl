@@ -62,6 +62,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = length(aws_glue_job.silver) == 0
+    error_message = "The Glue Silver job must be disabled by default."
+  }
+
+  assert {
     condition     = length(aws_redshiftserverless_workgroup.platform) == 0
     error_message = "Redshift Serverless must be disabled by default."
   }
@@ -80,6 +85,42 @@ run "secure_and_cost_bounded_defaults" {
     condition     = output.evidence_status.aws_runtime == "RUNTIME_DEFERRED"
     error_message = "Offline Terraform must not claim AWS runtime verification."
   }
+}
+
+run "bounded_glue_silver_job_when_explicitly_enabled" {
+  command = plan
+
+  variables {
+    allowed_account_ids    = ["123456789012"]
+    budget_alert_email     = "owner@example.com"
+    enable_glue_silver_job = true
+  }
+
+  assert {
+    condition     = length(aws_glue_job.silver) == 1
+    error_message = "Explicit enablement must plan exactly one Glue Silver job."
+  }
+
+  assert {
+    condition     = aws_glue_job.silver[0].glue_version == "5.1" && aws_glue_job.silver[0].worker_type == "G.1X" && aws_glue_job.silver[0].number_of_workers == 2
+    error_message = "The Glue version and worker bounds must stay pinned."
+  }
+
+  assert {
+    condition     = aws_glue_job.silver[0].timeout == 30 && aws_glue_job.silver[0].max_retries == 0 && aws_glue_job.silver[0].execution_property[0].max_concurrent_runs == 1
+    error_message = "Glue timeout, retries and concurrency must remain bounded."
+  }
+}
+
+run "rejects_glue_without_budget_recipient" {
+  command = plan
+
+  variables {
+    allowed_account_ids    = ["123456789012"]
+    enable_glue_silver_job = true
+  }
+
+  expect_failures = [terraform_data.guardrails]
 }
 
 run "bounded_ingestion_lambda_when_explicitly_enabled" {
