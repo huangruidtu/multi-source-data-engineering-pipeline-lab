@@ -1,0 +1,20 @@
+mdep_aws04_gold:
+  target: duckdb
+  outputs:
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('MDEP_GOLD_DUCKDB_PATH', 'target/mdep_gold.duckdb') }}"
+      schema: gold
+      threads: 2
+    redshift:
+      type: redshift
+      method: database
+      host: "{{ env_var('MDEP_REDSHIFT_HOST', 'redshift-runtime-required.invalid') }}"
+      port: "{{ env_var('MDEP_REDSHIFT_PORT', '5439') | int }}"
+      dbname: "{{ env_var('MDEP_REDSHIFT_DATABASE', 'mdep') }}"
+      schema: "{{ env_var('MDEP_REDSHIFT_SCHEMA', 'gold') }}"
+      user: "{{ env_var('MDEP_REDSHIFT_USER', 'runtime_required') }}"
+      password: "{{ env_var('MDEP_REDSHIFT_PASSWORD', 'runtime-required') }}"
+      sslmode: verify-full
+      threads: 2
+      connect_timeout: 10

@@ -1,0 +1,3 @@
+product_id,product_name,category_code,unit_price,currency,updated_at,source_lsn,applied_at,ingested_at,record_hash
+prod-100,Telemetry Sensor,ELEC,49.90,EUR,2025-01-01 10:00:00,300,2025-01-01 10:00:01,2025-01-01 10:00:02,product-100-v1
+prod-200,Unclassified Sample,MISSING_CATEGORY,79.00,DKK,2025-01-02 10:00:00,301,2025-01-02 10:00:01,2025-01-02 10:00:02,product-200-v1

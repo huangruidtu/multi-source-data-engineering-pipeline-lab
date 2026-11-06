@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: cdc_silver
+    description: >-
+      FUTURE AWS-05 BOUNDARY. These current-state commerce tables do not exist in
+      AWS-04. The DuckDB target substitutes bounded fixture_* seeds explicitly.
+    schema: "{{ env_var('MDEP_CDC_SILVER_SCHEMA', 'silver_cdc') }}"
+    tables:
+      - name: core_customers
+      - name: core_products
+      - name: core_orders
+      - name: core_payments
+
+  - name: silver_iceberg
+    description: AWS-03 Iceberg v2 tables exposed through the parameterized Redshift external schema.
+    schema: "{{ env_var('MDEP_SILVER_EXTERNAL_SCHEMA', 'silver_iceberg') }}"
+    tables:
+      - name: ref_exchange_rates
+      - name: ref_locations

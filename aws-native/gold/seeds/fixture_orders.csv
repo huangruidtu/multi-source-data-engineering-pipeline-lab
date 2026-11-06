@@ -1,0 +1,4 @@
+order_id,customer_id,order_status,order_ts,currency,order_total,updated_at,source_lsn,applied_at,ingested_at,record_hash
+ord-100,cust-100,completed,2025-02-01 12:00:00,EUR,100.00,2025-02-01 12:05:00,400,2025-02-01 12:05:01,2025-02-01 12:05:02,order-100-v1
+ord-200,cust-missing,created,2025-02-01 13:00:00,DKK,50.00,2025-02-01 13:00:00,401,2025-02-01 13:00:01,2025-02-01 13:00:02,order-200-v1
+ord-300,cust-200,completed,2025-02-02 12:00:00,EUR,30.00,2025-02-02 12:05:00,402,2025-02-02 12:05:01,2025-02-02 12:05:02,order-300-v1

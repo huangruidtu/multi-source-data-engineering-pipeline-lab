@@ -46,7 +46,7 @@ Glue service --assume role--> AWS-03 Silver role
                                       `--write--> one CloudWatch log group
 
 Redshift service --assume role--> Redshift role
-                                      |--read--> bronze/iceberg prefixes
+                                      |--read--> iceberg/ prefix
                                       |--read--> one Glue database/tables
                                       `--decrypt via S3--> one KMS key
 ```
@@ -82,9 +82,10 @@ credentials. Pull-request validation needs no AWS credentials.
   module tested with local HadoopCatalog. The AWS configuration uses
   GlueCatalog/S3FileIO and built-in Iceberg 1.10.0. No crawler is created because
   contracts and table ownership are explicit.
-- **Redshift Serverless:** private, encrypted, enhanced-VPC-routing skeleton.
-  It is disabled by default to prevent idle spend and does not claim a working
-  SQL/dbt path.
+- **Redshift Serverless and dbt:** private, encrypted, enhanced-VPC-routing Gold
+  target. It is disabled by default, fixed at 8 RPUs and query-deactivated after
+  16 monthly RPU-hours. The SQL is executed through a DuckDB fixture bridge and
+  parsed for Redshift; no live Redshift runtime is claimed.
 - **AWS Budgets:** visibility guardrail. It alerts but cannot guarantee a hard
   spend stop, so Redshift opt-in and capacity caps remain primary controls.
 
@@ -103,18 +104,19 @@ credentials. Pull-request validation needs no AWS credentials.
 | Bronze manifest or Parquet is corrupt | AWS-03 verifies versions, identity, path, row count and both checksums before creating any Silver write plan; the run fails closed. |
 | Silver commit succeeds, acknowledgment fails | Re-run sees the committed Iceberg state: exact rows are unchanged, quarantine and reconciliation use deterministic MERGE keys, then acknowledgment can be retried. No cross-table transaction is claimed. |
 | Older reference data arrives later | MERGE compares business version, source extraction time and ingestion time in that order; an older business version cannot win because of arrival time or hash. |
-| Redshift idle cost | Resource absent by default; when enabled, private networking and max-RPU cap apply. |
+| Redshift idle/runaway cost | Resource absent by default; enabled use requires a budget recipient and private networking, stays at 8 RPUs, and deactivates queries at 16 monthly RPU-hours. |
 | KMS key deletion | 30-day deletion window and Terraform destroy protection allow recovery before deletion completes. |
 | Bad/late source data | Bronze remains replayable; quarantine retains evidence; later writers must apply existing V1 ordering rules. |
 
-## Deliberate gaps after AWS-03
+## Deliberate gaps after AWS-04
 
 - No AWS account/runtime validation and no `terraform apply` evidence.
 - No remote Terraform state/locking bootstrap.
 - No VPC, NAT gateway or interface endpoints; approved existing private subnets
   are inputs for Redshift to avoid hiding networking cost.
-- No automatic AWS Glue trigger, Redshift SQL or dbt execution. The Glue job
-  requires an explicit controlled list of `_COMMITTED.json` keys at invocation.
+- No automatic AWS Glue trigger or live Redshift/dbt execution. The Glue job
+  requires an explicit controlled list of `_COMMITTED.json` keys at invocation;
+  Gold uses bounded commerce fixtures until AWS-05 owns the `core_*` tables.
 - Airflow is authored against its public SDK and parsed in Linux CI. Native
   Windows is not a supported Airflow runtime; its interval resolver is still
   tested locally there.
