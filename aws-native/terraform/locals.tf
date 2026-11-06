@@ -22,6 +22,7 @@ locals {
 
   github_oidc_provider_arn = var.create_github_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : var.existing_github_oidc_provider_arn
   glue_database_name       = replace("${var.project_name}_${var.environment}_silver", "-", "_")
+  cdc_entities             = ["customers", "products", "orders", "payments"]
 }
 
 resource "terraform_data" "guardrails" {
@@ -58,6 +59,14 @@ resource "terraform_data" "guardrails" {
     precondition {
       condition     = !var.enable_glue_silver_job || var.budget_alert_email != null
       error_message = "The Glue Silver job requires budget_alert_email before paid workers are enabled."
+    }
+    precondition {
+      condition     = !var.enable_dms_cdc || (var.cdc_postgres_secret_arn != null && length(var.cdc_subnet_ids) >= 2 && length(var.cdc_security_group_ids) >= 1)
+      error_message = "DMS CDC requires an exact PostgreSQL secret, at least two reviewed private subnets and one security group."
+    }
+    precondition {
+      condition     = !var.enable_dms_cdc || var.budget_alert_email != null
+      error_message = "DMS CDC requires budget_alert_email before paid replication and streaming resources are enabled."
     }
   }
 }

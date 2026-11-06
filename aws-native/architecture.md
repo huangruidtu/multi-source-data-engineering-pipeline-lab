@@ -144,3 +144,18 @@ time. Any business or other provenance change remains a conflict.
 - Budget notifications are inactive until an email is deliberately supplied.
 - The OIDC provider is account-global; an account with an existing GitHub
   provider should set `create_github_oidc_provider=false` and pass its ARN.
+
+## AWS-05 CDC extension
+
+PostgreSQL logical replication is read by DMS and written as native
+JSON_UNFORMATTED records to encrypted Kinesis. One Firehose consumer archives
+those records to entity-partitioned S3 Bronze; an independent canonical consumer
+invokes the shared DMS adapter and Iceberg writer. These are intentionally two
+boundaries: an archive delivery cannot mutate Silver, and a Silver failure does
+not erase replay material.
+
+The canonical tables are Iceberg v2 `core_*` current-state ledgers. Their primary
+key, business payload, durable deletion marker, source LSN/transaction order and
+applied/ingested provenance commit in one MERGE. Gold filters `is_deleted`; the
+checkpoint remains available to reject stale resurrection. See ADR-0003 for the
+ordering and ambiguity policy.

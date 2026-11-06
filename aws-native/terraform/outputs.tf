@@ -43,6 +43,16 @@ output "glue_silver_job_enabled" {
   value       = var.enable_glue_silver_job
 }
 
+output "dms_cdc_enabled" {
+  description = "Whether the paid AWS-05 DMS/Kinesis/Firehose path is planned."
+  value       = var.enable_dms_cdc
+}
+
+output "cdc_stream_arn" {
+  description = "Exact Kinesis source for the independent canonical CDC writer when enabled."
+  value       = var.enable_dms_cdc ? aws_kinesis_stream.cdc[0].arn : null
+}
+
 output "evidence_status" {
   description = "Honest AWS-01 evidence boundary."
   value = {
@@ -52,6 +62,8 @@ output "evidence_status" {
     validation       = "OFFLINE_TESTED"
     airflow_linux_ci = "OFFLINE_CI_TESTED"
     spark_iceberg    = "LOCAL_LINUX_CI_TESTED"
+    dms_cdc_adapter  = "OFFLINE_TESTED"
+    aws05_iceberg    = "LOCAL_LINUX_CI_TESTED"
     aws_runtime      = "RUNTIME_DEFERRED"
   }
 }

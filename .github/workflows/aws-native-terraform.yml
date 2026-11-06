@@ -50,7 +50,7 @@ jobs:
       - name: Validate Lambda source package
         working-directory: .
         run: uv run --project aws-native --locked python aws-native/scripts/validate_lambda_package.py
-      - name: Run AWS-native ingestion, Airflow parse and policy tests
+      - name: Run AWS-native ingestion, CDC state, Airflow parse and policy tests
         working-directory: .
         run: uv run --project aws-native --locked python -m unittest discover -s aws-native/tests -v
       - name: Run original MDEP V1 regressions
@@ -77,7 +77,7 @@ jobs:
         run: |
           python -m pip install uv==0.11.21
           uv sync --project aws-native/spark --locked --python 3.11
-      - name: Run real AWS-02 to Spark to Iceberg integration
+      - name: Run real AWS-02/AWS-03 and DMS CDC to Iceberg integrations
         run: uv run --project aws-native/spark --locked python -m unittest discover -s aws-native/spark/tests -v
 
   gold-dbt-validation:

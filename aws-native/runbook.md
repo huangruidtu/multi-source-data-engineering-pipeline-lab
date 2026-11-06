@@ -94,3 +94,32 @@ Cleanup is intentionally a reviewed two-step procedure:
 
 KMS deletion has a 30-day recovery window. AWS Budgets and the account-global
 GitHub OIDC provider may be shared concerns; confirm ownership before removal.
+
+## AWS-05 DMS CDC activation and recovery
+
+Keep `enable_dms_cdc=false` unless an approved change supplies an exact source
+secret ARN, private subnets in at least two availability zones, reviewed
+security groups, the one allowed account ID and a budget recipient. Confirm the
+account already has the standard DMS VPC and CloudWatch service roles; this
+module deliberately does not attach broad account-global managed policies.
+
+Before starting a task, verify PostgreSQL `wal_level=logical`, replication-slot
+and WAL-sender capacity, free storage, SSL, the DMS replication user's table
+permissions, and primary keys on all four commerce tables. Test both endpoints.
+Review that the target is `json-unformatted`, transaction details are enabled,
+the object mappings partition per primary key, and batch/parallel apply remain
+disabled. Starting the task is a separate manual operation; Terraform sets
+`start_replication_task=false`.
+
+Monitor PostgreSQL retained WAL/free storage, DMS source/target latency and task
+state, Kinesis throttles and iterator age, Firehose delivery/error counts, S3
+errors, writer lag and quarantine growth. Alert on any task stop, slot/WAL growth,
+iterator age growth, Firehose error-prefix object, or fail-closed writer result.
+For recovery, stop the affected consumer/task, preserve the raw S3 prefix and
+quarantine evidence, repair the cause, then replay from the last committed
+source coordinate. Never move a checkpoint past a failed or incomparable event.
+
+Raw records belong under `bronze/cdc/<entity>/...`; Firehose errors belong under
+`bronze/cdc-errors/...`. They are newline-delimited DMS records, not AWS-02
+Parquet/manifest batches. The canonical writer is a separate Kinesis consumer
+boundary and must be deployed only in a separately reviewed change.
