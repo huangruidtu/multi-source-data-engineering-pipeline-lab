@@ -158,6 +158,21 @@ class RealIcebergPipelineTests(unittest.TestCase):
         snapshots = self.spark.sql(f"SELECT operation FROM {table}.snapshots").collect()
         self.assertGreaterEqual(len(snapshots), 3)
         self.assertTrue(all(row["operation"] in {"append", "overwrite"} for row in snapshots))
+        print("AWS05_CDC_ICEBERG_EVIDENCE=" + json.dumps({
+            "tombstone": {
+                "customer_id": tombstone["customer_id"],
+                "is_deleted": tombstone["is_deleted"],
+                "source_lsn": tombstone["source_lsn"],
+                "operation": tombstone["dms_operation"],
+            },
+            "live_rows": {
+                entity: self.spark.table(f"local.{namespace}.core_{entity}").where("not is_deleted").count()
+                for entity in ("customers", "products", "orders", "payments")
+            },
+            "quarantine_rows": quarantine.count(),
+            "distinct_quarantine_ids": quarantine.select("quarantine_id").distinct().count(),
+            "snapshot_operations": [row["operation"] for row in snapshots],
+        }, sort_keys=True))
 
     def test_identical_duplicate_occurrences_keep_independent_evidence_on_replay(self):
         context = batch_context("locations", 8)
