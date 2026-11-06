@@ -210,7 +210,7 @@ class PersistentStateTests(unittest.TestCase):
         record = dms_record("insert", CUSTOMER)
         path = append_ndjson(root, "customers", record)
         append_ndjson(root, "customers", dms_record("delete", {"customer_id": "cust-1"}))
-        self.assertIn("bronze\\cdc\\customers", str(path))
+        self.assertEqual(("bronze", "cdc", "customers", "records.ndjson"), path.relative_to(root).parts)
         lines = path.read_text(encoding="utf-8").splitlines()
         self.assertEqual(2, len(lines))
         self.assertTrue(all(json.loads(line)["metadata"]["record-type"] == "data" for line in lines))
