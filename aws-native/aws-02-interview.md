@@ -38,8 +38,10 @@ is captured from the real orchestration run once and reused across retries.
 
 **How did you make ingestion idempotent?** The run UUID is derived from source,
 entity, logical date and interval. Both keys are deterministic. Conditional
-writes prevent overwrite, and an identical retry must match the actual payload
-and manifest checksums before returning `already_published`.
+writes prevent overwrite. Manifest v2 verifies the stored Parquet checksum and
+a second source-content checksum that excludes only `ingested_at`, so an
+independent identical replay preserves the first landing while changed business
+or source-provenance content remains a conflict.
 
 **What happens when REST pagination fails?** Pages are accumulated in memory
 under page/record limits, but nothing is serialized or published until the

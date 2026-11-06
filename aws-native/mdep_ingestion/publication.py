@@ -18,6 +18,21 @@ from .models import (
     utc_iso,
 )
 from .object_store import ConditionalWriteConflict, ObjectStore, ObjectStoreFailure
+from .serialization import inspect_parquet
+
+
+MANIFEST_IDENTITY_FIELDS = (
+    "manifest_version",
+    "contract_version",
+    "format_version",
+    "logical_run_identity",
+    "source_name",
+    "source_entity",
+    "logical_date",
+    "interval_start",
+    "interval_end",
+    "data_key",
+)
 
 
 def manifest_for(context: BatchContext, payload: PreparedPayload) -> dict[str, Any]:
@@ -33,6 +48,7 @@ def manifest_for(context: BatchContext, payload: PreparedPayload) -> dict[str, A
         "interval_end": utc_iso(context.interval_end),
         "record_count": payload.record_count,
         "payload_checksum": f"sha256:{payload.checksum}",
+        "source_content_checksum": f"sha256:{payload.source_content_checksum}",
         "data_key": context.data_key,
     }
 
@@ -42,35 +58,46 @@ class BronzePublisher:
 
     S3 cannot atomically commit two objects. The manifest is therefore the
     consumer-visible commit boundary. Orphan data is never considered committed
-    and can be completed only when its bytes match the retried payload.
+    and can be completed only when its verified source content matches the retry;
+    the first object's bytes and ingestion provenance remain authoritative.
     """
 
     def __init__(self, store: ObjectStore):
         self.store = store
 
-    def _actual_checksum(self, key: str) -> str:
-        return sha256_hex(self.store.get_bytes(key))
-
-    def _validate_committed(self, context: BatchContext, payload: PreparedPayload, expected_manifest: dict[str, Any]) -> PublicationResult:
+    def _validate_committed(self, context: BatchContext, payload: PreparedPayload) -> PublicationResult:
         if self.store.head(context.data_key) is None:
             return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "manifest_exists_but_data_missing")
         try:
             stored_manifest = json.loads(self.store.get_bytes(context.manifest_key).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError, ObjectStoreFailure):
+            stored_payload = inspect_parquet(self.store.get_bytes(context.data_key))
+        except (UnicodeDecodeError, json.JSONDecodeError, ObjectStoreFailure, ValueError):
             return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "invalid_existing_manifest")
-        if stored_manifest != expected_manifest:
+        expected_manifest = manifest_for(context, payload)
+        if any(stored_manifest.get(field) != expected_manifest[field] for field in MANIFEST_IDENTITY_FIELDS):
             return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "manifest_content_conflict")
-        if self._actual_checksum(context.data_key) != payload.checksum:
+        if stored_manifest.get("payload_checksum") != f"sha256:{stored_payload.checksum}":
             return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "manifest_data_checksum_mismatch")
-        return PublicationResult(Status.ALREADY_PUBLISHED, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "verified_identical_replay")
+        if stored_manifest.get("record_count") != stored_payload.record_count:
+            return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "manifest_record_count_mismatch")
+        if stored_manifest.get("source_content_checksum") != f"sha256:{stored_payload.source_content_checksum}":
+            return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "manifest_source_content_checksum_mismatch")
+        if stored_payload.source_content_checksum != payload.source_content_checksum:
+            return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "source_content_conflict")
+        detail = "verified_identical_retry" if stored_payload.checksum == payload.checksum else "verified_independent_replay_preserved_first_ingestion"
+        return PublicationResult(
+            Status.ALREADY_PUBLISHED,
+            context.data_key,
+            context.manifest_key,
+            stored_payload.record_count,
+            stored_payload.checksum,
+            detail,
+        )
 
     def publish(self, context: BatchContext, payload: PreparedPayload) -> PublicationResult:
-        manifest = manifest_for(context, payload)
-        manifest_bytes = canonical_json_bytes(manifest)
-        manifest_checksum = sha256_hex(manifest_bytes)
         try:
             if self.store.head(context.manifest_key) is not None:
-                return self._validate_committed(context, payload, manifest)
+                return self._validate_committed(context, payload)
 
             data_was_written = False
             if self.store.head(context.data_key) is None:
@@ -86,8 +113,16 @@ class BronzePublisher:
                     pass
             if self.store.head(context.data_key) is None:
                 return PublicationResult(Status.FAILED, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "data_write_not_visible")
-            if self._actual_checksum(context.data_key) != payload.checksum:
-                return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "data_exists_with_different_content")
+            try:
+                stored_payload = inspect_parquet(self.store.get_bytes(context.data_key))
+            except (ObjectStoreFailure, ValueError):
+                return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "invalid_existing_data")
+            if stored_payload.source_content_checksum != payload.source_content_checksum:
+                return PublicationResult(Status.CONFLICT, context.data_key, context.manifest_key, payload.record_count, payload.checksum, "data_exists_with_different_source_content")
+
+            manifest = manifest_for(context, stored_payload)
+            manifest_bytes = canonical_json_bytes(manifest)
+            manifest_checksum = sha256_hex(manifest_bytes)
 
             try:
                 self.store.put_bytes_if_absent(
@@ -97,13 +132,13 @@ class BronzePublisher:
                     checksum=manifest_checksum,
                 )
             except ConditionalWriteConflict:
-                return self._validate_committed(context, payload, manifest)
+                return self._validate_committed(context, payload)
             return PublicationResult(
                 Status.PUBLISHED,
                 context.data_key,
                 context.manifest_key,
-                payload.record_count,
-                payload.checksum,
+                stored_payload.record_count,
+                stored_payload.checksum,
                 "committed_new_data" if data_was_written else "recovered_matching_orphan_data",
             )
         except ObjectStoreFailure as error:
@@ -118,6 +153,7 @@ class BronzePublisher:
             "source_entity",
             "record_count",
             "payload_checksum",
+            "source_content_checksum",
             "data_key",
             "interval_start",
             "interval_end",
@@ -126,8 +162,13 @@ class BronzePublisher:
         if not required.issubset(manifest):
             raise ValueError(f"manifest is missing fields: {sorted(required.difference(manifest))}")
         data = self.store.get_bytes(manifest["data_key"])
-        if manifest["payload_checksum"] != f"sha256:{sha256_hex(data)}":
+        payload = inspect_parquet(data)
+        if manifest["payload_checksum"] != f"sha256:{payload.checksum}":
             raise ValueError("manifest checksum does not match the stored data object")
+        if manifest["record_count"] != payload.record_count:
+            raise ValueError("manifest record count does not match the stored data object")
+        if manifest["source_content_checksum"] != f"sha256:{payload.source_content_checksum}":
+            raise ValueError("manifest source content checksum does not match the stored data object")
         return manifest
 
     def list_committed(self, prefix: str = "bronze/") -> list[dict[str, Any]]:

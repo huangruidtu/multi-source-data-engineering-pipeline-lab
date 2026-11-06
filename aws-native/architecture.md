@@ -90,7 +90,7 @@ credentials. Pull-request validation needs no AWS credentials.
 | Source operation retry | The UUIDv5 run identity and conditional object writes make identical replay a verified no-op. |
 | Missing S3 object | The adapter lists the exact target key under an IAM-restricted Bronze/quarantine prefix before HEAD; a list 403 remains a failure, never a false absence. |
 | REST page 3 fails | Extraction finishes all pages before serialization; no canonical data or manifest is written. |
-| Data write succeeds, manifest fails | Data is an invisible orphan; identical retry verifies its checksum and publishes the manifest last. |
+| Data write succeeds, manifest fails | Data is an invisible orphan; retry verifies the stored Parquet, record count and source-content checksum, then publishes a manifest describing those actual first bytes. |
 | Redshift idle cost | Resource absent by default; when enabled, private networking and max-RPU cap apply. |
 | KMS key deletion | 30-day deletion window and Terraform destroy protection allow recovery before deletion completes. |
 | Bad/late source data | Bronze remains replayable; quarantine retains evidence; later writers must apply existing V1 ordering rules. |
@@ -118,6 +118,12 @@ credentials. Pull-request validation needs no AWS credentials.
   DAG run or explicit Lambda invocation begins. Retries reuse that value, so a
   historical backfill remains truthful without changing Parquet bytes and
   causing a false publication conflict.
+
+Manifest v2 records both the physical Parquet checksum and an order-independent
+source-content checksum over every row field except `ingested_at`. A retry in
+one DagRun normally matches both. An independent, identical replay may differ
+only in ingestion time and is a verified no-op that preserves the first landing
+time. Any business or other provenance change remains a conflict.
 - Budget notifications are inactive until an email is deliberately supplied.
 - The OIDC provider is account-global; an account with an existing GitHub
   provider should set `create_github_oidc_provider=false` and pass its ARN.

@@ -65,6 +65,11 @@ Invoke it explicitly with an orchestrator and one source operation containing
 `ingested_at`; file operations also require a `source/reference/` key. Capture
 `ingested_at` once at orchestration-run start and reuse the identical event on
 retry. Do not derive it from `interval_end` and do not regenerate it per retry.
+An independently requested replay uses the same logical identity; when its
+source content is identical, publication returns `already_published` and keeps
+the first landing bytes and timestamp. To intentionally create another Bronze
+object, choose a different approved logical identity rather than weakening the
+immutable-key checks.
 Do not label the function runtime verified until an approved AWS smoke test
 proves the layer, networking, secret, source endpoints, KMS and S3 behavior.
 

@@ -14,7 +14,7 @@ from typing import Any
 
 CONTRACT_VERSION = "mdep-6-v1"
 FORMAT_VERSION = "parquet-v1"
-MANIFEST_VERSION = "mdep-bronze-manifest-v1"
+MANIFEST_VERSION = "mdep-bronze-manifest-v2"
 RUN_NAMESPACE = uuid.UUID("8f40746f-d3ce-52c7-9694-9f367cf03f40")
 ENVELOPE_FIELDS = frozenset(
     {
@@ -166,6 +166,7 @@ class PreparedPayload:
     data: bytes
     record_count: int
     checksum: str
+    source_content_checksum: str
 
 
 @dataclass(frozen=True)

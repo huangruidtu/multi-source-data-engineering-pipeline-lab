@@ -16,18 +16,18 @@ from mdep_ingestion.publication import BronzePublisher, manifest_for
 from mdep_ingestion.serialization import read_parquet, to_parquet
 
 
-def context():
+def context(ingested_at=None):
     return BatchContext(
         "rest_api",
         "locations",
         date(2025, 2, 1),
         datetime(2025, 2, 1, tzinfo=timezone.utc),
         datetime(2025, 2, 2, tzinfo=timezone.utc),
-        datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
+        ingested_at or datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc),
     )
 
 
-def records(name="Copenhagen"):
+def records(name="Copenhagen", ingested_at="2025-02-02T12:30:00Z"):
     return [
         {
             "location_id": "loc-1",
@@ -40,7 +40,7 @@ def records(name="Copenhagen"):
             "source_entity": "locations",
             "source_record_key": "loc-1",
             "source_extract_ts": "2025-02-01T00:00:00Z",
-            "ingested_at": "2025-02-02T12:30:00Z",
+            "ingested_at": ingested_at,
             "source_version": None,
             "source_locator": "page=1",
             "record_hash": "a" * 64,
@@ -63,16 +63,40 @@ class PublicationTests(unittest.TestCase):
 
     def test_parquet_preserves_optional_field_first_seen_in_second_record(self):
         two_records = [records()[0], {**records("Aarhus")[0], "location_id": "loc-2", "optional_region_code": "DK-82"}]
-        round_trip = read_parquet(to_parquet(two_records).data)
+        prepared = to_parquet(two_records)
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalObjectStore(directory)
+            result = BronzePublisher(store).publish(context(), prepared)
+            round_trip = read_parquet(store.get_bytes(context().data_key))
+        self.assertEqual(Status.PUBLISHED, result.status)
         self.assertIn("optional_region_code", round_trip[0])
         self.assertIsNone(round_trip[0]["optional_region_code"])
         self.assertEqual("DK-82", round_trip[1]["optional_region_code"])
+
+    def test_independent_identical_replay_preserves_first_ingestion_time(self):
+        first_time = datetime(2025, 2, 2, 12, 30, tzinfo=timezone.utc)
+        replay_time = datetime(2025, 3, 1, 9, 45, tzinfo=timezone.utc)
+        first_records = records(ingested_at="2025-02-02T12:30:00Z")
+        replay_records = records(ingested_at="2025-03-01T09:45:00Z")
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalObjectStore(directory)
+            publisher = BronzePublisher(store)
+            first = publisher.publish(context(first_time), to_parquet(first_records))
+            replay = publisher.publish(context(replay_time), to_parquet(replay_records))
+            stored = read_parquet(store.get_bytes(first.data_key))
+        self.assertEqual(Status.PUBLISHED, first.status)
+        self.assertEqual(Status.ALREADY_PUBLISHED, replay.status)
+        self.assertEqual("verified_independent_replay_preserved_first_ingestion", replay.detail)
+        self.assertEqual("2025-02-02T12:30:00Z", stored[0]["ingested_at"])
 
     def test_changed_content_under_same_identity_is_conflict(self):
         with tempfile.TemporaryDirectory() as directory:
             publisher = BronzePublisher(LocalObjectStore(directory))
             self.assertEqual(Status.PUBLISHED, publisher.publish(context(), to_parquet(records())).status)
-            conflict = publisher.publish(context(), to_parquet(records("Aarhus")))
+            conflict = publisher.publish(
+                context(datetime(2025, 3, 1, 9, 45, tzinfo=timezone.utc)),
+                to_parquet(records("Aarhus", "2025-03-01T09:45:00Z")),
+            )
             self.assertEqual(Status.CONFLICT, conflict.status)
             self.assertIn("conflict", conflict.detail)
 
@@ -85,6 +109,23 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(Status.PUBLISHED, result.status)
             self.assertEqual("recovered_matching_orphan_data", result.detail)
             self.assertIsNotNone(store.head(context().manifest_key))
+
+    def test_independent_replay_recovers_matching_orphan_without_rewriting_data(self):
+        original = to_parquet(records(ingested_at="2025-02-02T12:30:00Z"))
+        replay = to_parquet(records(ingested_at="2025-03-01T09:45:00Z"))
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalObjectStore(directory)
+            store.put_bytes_if_absent(context().data_key, original.data, content_type="application/vnd.apache.parquet", checksum=original.checksum)
+            result = BronzePublisher(store).publish(
+                context(datetime(2025, 3, 1, 9, 45, tzinfo=timezone.utc)),
+                replay,
+            )
+            manifest = json.loads(store.get_bytes(context().manifest_key))
+            stored = read_parquet(store.get_bytes(context().data_key))
+        self.assertEqual(Status.PUBLISHED, result.status)
+        self.assertEqual("recovered_matching_orphan_data", result.detail)
+        self.assertEqual(f"sha256:{original.checksum}", manifest["payload_checksum"])
+        self.assertEqual("2025-02-02T12:30:00Z", stored[0]["ingested_at"])
 
     def test_orphan_with_changed_content_and_manifest_without_data_conflict(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -5,7 +5,18 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from .models import PreparedPayload, sha256_hex
+from .models import PreparedPayload, canonical_json_bytes, sha256_hex
+
+
+def source_content_checksum(records: list[dict[str, Any]]) -> str:
+    """Hash source/provenance content while excluding only the run's actual ingestion time."""
+
+    field_names = sorted({field for record in records for field in record if field != "ingested_at"})
+    row_hashes = sorted(
+        sha256_hex(canonical_json_bytes({field: record.get(field) for field in field_names}))
+        for record in records
+    )
+    return sha256_hex(canonical_json_bytes(row_hashes))
 
 
 def to_parquet(records: list[dict[str, Any]]) -> PreparedPayload:
@@ -41,10 +52,25 @@ def to_parquet(records: list[dict[str, Any]]) -> PreparedPayload:
         data_page_version="1.0",
     )
     data = sink.getvalue()
-    return PreparedPayload(data=data, record_count=len(records), checksum=sha256_hex(data))
+    return PreparedPayload(
+        data=data,
+        record_count=len(records),
+        checksum=sha256_hex(data),
+        source_content_checksum=source_content_checksum(records),
+    )
 
 
 def read_parquet(data: bytes) -> list[dict[str, Any]]:
     import pyarrow.parquet as pq
 
     return pq.read_table(io.BytesIO(data)).to_pylist()
+
+
+def inspect_parquet(data: bytes) -> PreparedPayload:
+    records = read_parquet(data)
+    return PreparedPayload(
+        data=data,
+        record_count=len(records),
+        checksum=sha256_hex(data),
+        source_content_checksum=source_content_checksum(records),
+    )

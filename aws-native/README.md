@@ -125,6 +125,12 @@ captured once by the orchestrator and reused for task retries. Lambda callers
 must supply that stable `ingested_at`; it is intentionally not derived from the
 historical interval boundary.
 
+Replay policy is encoded in manifest v2: a same-run retry has the same physical
+and source-content checksums; an independent replay may have a later
+`ingested_at` but returns `already_published` when every other row field matches,
+leaving the first immutable object untouched. Business or source-provenance
+changes alter the source-content checksum and remain conflicts.
+
 ## 30-60 second interview explanation
 
 > I kept the AWS work in `aws-native/` so the original MDEP evidence remains
