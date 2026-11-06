@@ -332,8 +332,10 @@ def process_verified_batch(
     checked = transform(raw, verified).cache()
     input_count = checked.count()
     winners, rejected, duplicate_count = deduplicate(checked, verified.source_entity)
-    accepted_count = winners.count()
-    rejected_count = rejected.count()
+    unique_winner_count = winners.count()
+    quarantined_count = rejected.count()
+    rejected_count = quarantined_count - duplicate_count
+    accepted_count = input_count - rejected_count
     business_table = f"{catalog}.{namespace}.ref_{verified.source_entity}"
     inserted, updated, unchanged = _merge_business(spark, winners, verified.source_entity, business_table)
     _merge_quarantine(spark, rejected, verified, f"{catalog}.{namespace}.silver_quarantine")
@@ -344,7 +346,7 @@ def process_verified_batch(
         accepted_count=accepted_count,
         rejected_count=rejected_count,
         duplicate_count=duplicate_count,
-        unique_winner_count=accepted_count,
+        unique_winner_count=unique_winner_count,
         inserted_count=inserted,
         updated_count=updated,
         unchanged_count=unchanged,

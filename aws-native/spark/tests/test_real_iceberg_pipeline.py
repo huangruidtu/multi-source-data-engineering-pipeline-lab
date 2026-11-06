@@ -66,7 +66,7 @@ class RealIcebergPipelineTests(unittest.TestCase):
         ]
         first = publish(self.store, batch_context("exchange_rates", 1), rates)
         result = process_verified_batch(self.spark, first, self.data_path(first))
-        self.assertEqual((4, 1, 3, 1, 1, 1, 0, 0), (
+        self.assertEqual((4, 2, 2, 1, 1, 1, 0, 0), (
             result.input_count, result.accepted_count, result.rejected_count, result.duplicate_count,
             result.unique_winner_count, result.inserted_count, result.updated_count, result.unchanged_count,
         ))
