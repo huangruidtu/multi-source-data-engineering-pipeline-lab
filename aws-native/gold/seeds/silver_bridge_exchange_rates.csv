@@ -1,0 +1,2 @@
+rate_date,base_currency,quote_currency,rate,retrieved_at,provider_name,source_extract_ts,ingested_at,record_hash,manifest_key
+2025-02-01,EUR,DKK,7.4800000000,2025-02-01 06:00:00,ECB,2025-02-01 06:00:00,2025-02-01 06:05:00,rate-eur-dkk-20250201,bronze/rest_api/exchange_rates/2025-02-01/_COMMITTED.json

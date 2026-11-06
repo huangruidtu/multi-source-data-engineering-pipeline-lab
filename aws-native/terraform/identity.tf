@@ -301,7 +301,7 @@ data "aws_iam_policy_document" "redshift" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["bronze/*", "iceberg/*"]
+      values   = ["iceberg/*"]
     }
   }
 
@@ -309,7 +309,7 @@ data "aws_iam_policy_document" "redshift" {
     sid       = "ReadApprovedLakePrefixes"
     effect    = "Allow"
     actions   = ["s3:GetObject", "s3:GetObjectVersion"]
-    resources = ["${aws_s3_bucket.data.arn}/bronze/*", "${aws_s3_bucket.data.arn}/iceberg/*"]
+    resources = ["${aws_s3_bucket.data.arn}/iceberg/*"]
   }
 
   statement {

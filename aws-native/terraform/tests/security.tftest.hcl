@@ -72,6 +72,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = length(aws_redshiftserverless_usage_limit.monthly_compute) == 0
+    error_message = "The Redshift usage limit must also be absent while Redshift is disabled."
+  }
+
+  assert {
     condition     = aws_budgets_budget.monthly.limit_amount == "25"
     error_message = "The default monthly budget must stay at USD 25."
   }
@@ -184,6 +189,33 @@ run "rejects_redshift_without_private_network_inputs" {
   }
 
   expect_failures = [terraform_data.guardrails]
+}
+
+run "bounded_redshift_when_explicitly_enabled" {
+  command = plan
+
+  variables {
+    allowed_account_ids         = ["123456789012"]
+    budget_alert_email          = "owner@example.com"
+    enable_redshift_serverless  = true
+    redshift_subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
+    redshift_security_group_ids = ["sg-11111111"]
+  }
+
+  assert {
+    condition     = aws_redshiftserverless_workgroup.platform[0].publicly_accessible == false && aws_redshiftserverless_workgroup.platform[0].enhanced_vpc_routing == true
+    error_message = "Enabled Redshift must remain private with enhanced VPC routing."
+  }
+
+  assert {
+    condition     = aws_redshiftserverless_workgroup.platform[0].base_capacity == 8 && aws_redshiftserverless_workgroup.platform[0].max_capacity == 8
+    error_message = "Enabled Redshift must retain the reviewed 8 RPU capacity cap."
+  }
+
+  assert {
+    condition     = aws_redshiftserverless_usage_limit.monthly_compute[0].usage_type == "serverless-compute" && aws_redshiftserverless_usage_limit.monthly_compute[0].amount == 16 && aws_redshiftserverless_usage_limit.monthly_compute[0].period == "monthly" && aws_redshiftserverless_usage_limit.monthly_compute[0].breach_action == "deactivate"
+    error_message = "Redshift compute must deactivate at the bounded monthly RPU-hour limit."
+  }
 }
 
 run "rejects_empty_account_allow_list" {

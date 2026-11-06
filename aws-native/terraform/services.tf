@@ -93,6 +93,16 @@ resource "aws_redshiftserverless_workgroup" "platform" {
   security_group_ids   = var.redshift_security_group_ids
 }
 
+resource "aws_redshiftserverless_usage_limit" "monthly_compute" {
+  count = var.enable_redshift_serverless ? 1 : 0
+
+  resource_arn  = aws_redshiftserverless_workgroup.platform[0].arn
+  usage_type    = "serverless-compute"
+  amount        = var.redshift_monthly_rpu_hours
+  period        = "monthly"
+  breach_action = "deactivate"
+}
+
 resource "aws_budgets_budget" "monthly" {
   name         = "${local.name_prefix}-monthly-cost"
   budget_type  = "COST"

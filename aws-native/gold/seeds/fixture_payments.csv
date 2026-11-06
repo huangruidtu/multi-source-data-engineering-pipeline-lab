@@ -1,0 +1,3 @@
+payment_id,order_id,payment_status,payment_ts,amount,currency,authorization_code,updated_at,source_lsn,applied_at,ingested_at,record_hash
+pay-100,ord-100,completed,2025-02-01 12:01:00,100.00,EUR,auth-100,2025-02-01 12:05:00,500,2025-02-01 12:05:01,2025-02-01 12:05:02,payment-100-v1
+pay-200,ord-missing,failed,2025-02-02 12:01:00,20.00,DKK,,2025-02-02 12:10:00,501,2025-02-02 12:10:01,2025-02-02 12:10:02,payment-200-v1

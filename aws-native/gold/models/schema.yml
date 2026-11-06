@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: stg_exchange_rates
+    description: Grain is one AWS-03 rate_date/base_currency/quote_currency row.
+
+  - name: dim_customers
+    description: "Grain: one current customer; Type 1 attributes."
+    columns:
+      - name: customer_sk
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_tests: [not_null, unique]
+      - name: customer_status
+        data_tests:
+          - accepted_values:
+              arguments: {values: [ACTIVE, INACTIVE, SUSPENDED]}
+
+  - name: dim_products
+    description: "Grain: one current product."
+    columns:
+      - name: product_sk
+        data_tests: [not_null, unique]
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: dim_locations
+    description: "Grain: one current AWS-03 reference location."
+    columns:
+      - name: location_sk
+        data_tests: [not_null, unique]
+      - name: location_id
+        data_tests: [not_null, unique]
+
+  - name: dim_date
+    description: "Grain: one observed commerce business date."
+    columns:
+      - name: date_sk
+        data_tests: [not_null, unique]
+      - name: date_day
+        data_tests: [not_null, unique]
+
+  - name: fct_orders
+    description: "Grain: one current order, incrementally MERGEd by order_id."
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+      - name: customer_sk
+        data_tests:
+          - relationships:
+              arguments: {to: "ref('dim_customers')", field: customer_sk}
+              config: {severity: warn, where: "customer_sk is not null"}
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments: {values: [created, completed, cancelled]}
+
+  - name: fct_payments
+    description: "Grain: one current payment; unmatched source_order_id remains visible."
+    columns:
+      - name: payment_id
+        data_tests: [not_null, unique]
+      - name: matched_order_id
+        data_tests:
+          - relationships:
+              arguments: {to: "ref('fct_orders')", field: order_id}
+              config: {severity: warn, where: "matched_order_id is not null"}
+      - name: payment_status
+        data_tests:
+          - accepted_values:
+              arguments: {values: [authorized, completed, failed, refunded]}
+
+  - name: mart_daily_sales
+    description: "Grain: one business date and source currency; converted DKK is separate."
+
+  - name: mart_customer_value
+    description: "Grain: one source customer identifier, including orphan identifiers."
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]

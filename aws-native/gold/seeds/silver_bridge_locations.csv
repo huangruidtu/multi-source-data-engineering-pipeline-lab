@@ -1,0 +1,2 @@
+location_id,location_name,country_code,timezone,region,updated_at,location_type,source_extract_ts,ingested_at,record_hash,manifest_key
+loc-100,Copenhagen Hub,DK,Europe/Copenhagen,nordics,2025-02-01 08:00:00,hub,2025-02-01 08:00:00,2025-02-01 08:05:00,location-100-v1,bronze/rest_api/locations/2025-02-01/_COMMITTED.json
