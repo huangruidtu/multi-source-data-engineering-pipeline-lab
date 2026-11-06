@@ -1,9 +1,10 @@
-# AWS-native MDEP (AWS-01 and AWS-02)
+# AWS-native MDEP (AWS-01 through AWS-03)
 
 This directory is the isolated AWS-native variant approved by
 [MDEP-66](https://ruiproject.atlassian.net/browse/MDEP-66) and
 [MDEP-67](https://ruiproject.atlassian.net/browse/MDEP-67) and
-[MDEP-68](https://ruiproject.atlassian.net/browse/MDEP-68). It does not change
+[MDEP-68](https://ruiproject.atlassian.net/browse/MDEP-68) and
+[MDEP-69](https://ruiproject.atlassian.net/browse/MDEP-69). It does not change
 the original MDEP V1 implementation or its runtime claims.
 
 ## Evidence status
@@ -15,11 +16,14 @@ the original MDEP V1 implementation or its runtime claims.
 | Real Parquet and manifest-last publication | OFFLINE TESTED | `serialization.py`, `publication.py` |
 | Airflow data-interval orchestration | LINUX CI TESTED | `orchestration/dags/`, offline workflow |
 | Thin ingestion Lambda | CODED, opt-in | `lambda/bronze_ingestion.py`; binary layer and networking are deployment gates |
+| Manifest-v2 integrity reader | OFFLINE TESTED | `mdep_silver/manifest.py`, corruption/orphan tests |
+| Spark 3.5.6 + Iceberg 1.10.0 MERGE | LOCAL LINUX SPARK/ICEBERG VERIFIED | `spark/tests/test_real_iceberg_pipeline.py`, GitHub Actions |
+| Glue 5.1 Silver job and scoped role | CODED, opt-in | `glue/`, `terraform/glue.tf`, `terraform/identity.tf` |
 | S3, KMS, IAM, Lambda and Glue Catalog | CODED | `terraform/` |
 | Redshift Serverless skeleton | CODED, opt-in | `enable_redshift_serverless=false` by default |
 | GitHub OIDC validation/plan workflow | CODED | `.github/workflows/aws-native-terraform.yml` |
 | Terraform format, validation and policy tests | OFFLINE TESTED | `scripts/validate.ps1`, `terraform/tests/`, `tests/` |
-| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 or AWS-02 |
+| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01, AWS-02 or AWS-03 |
 
 The captured local result is in `evidence.md`.
 
@@ -38,7 +42,7 @@ S3 data.parquet --manifest last--> S3 _COMMITTED.json
               |
               `--------------------> S3 quarantine/... (invalid evidence)
               |
-       future Glue Spark
+       verified Glue Spark
               v
 S3 Iceberg + Glue Data Catalog (Silver)
               |
@@ -47,9 +51,10 @@ S3 Iceberg + Glue Data Catalog (Silver)
         dbt-owned Gold
 ```
 
-AWS-02 adds executable Bronze ingestion only. Glue jobs, Iceberg tables and dbt
-models remain later sprint stories; a PostgreSQL snapshot is replay/backfill
-evidence and is not a second canonical CDC Silver writer.
+AWS-03 consumes only explicit, verified commit manifests and owns only
+`ref_exchange_rates` and `ref_locations`. PostgreSQL commerce snapshots are
+rejected at this ownership boundary; AWS-05 remains the sole planned writer for
+customer, product, order and payment current state. Gold remains out of scope.
 
 The implementation deliberately buffers one source operation so nothing is
 published after a partial REST traversal. Defaults cap PostgreSQL at 100,000
@@ -59,7 +64,10 @@ a service with more runtime/disk; those changes are outside AWS-02.
 
 ## Offline validation
 
-Prerequisites: Terraform 1.9+, uv and Python 3.12.
+Prerequisites: Terraform 1.9+, uv and Python 3.12 for AWS-02. The independent
+AWS-03 runtime is locked to Python 3.11, Spark 3.5.6 and Iceberg 1.10.0 under
+`spark/`; this explicitly avoids pretending the Python 3.12 Lambda environment
+can be reused by Glue 5.1.
 
 ```powershell
 ./aws-native/scripts/validate.ps1
@@ -68,6 +76,15 @@ Prerequisites: Terraform 1.9+, uv and Python 3.12.
 The script creates the locked Python environment and runs real PyArrow tests,
 Lambda package validation, the AWS-native tests, Terraform checks and all V1
 regressions. It never runs `terraform apply`.
+
+The real Linux Spark/Iceberg proof runs with Java 17:
+
+```bash
+export PYTHONPATH=aws-native
+export PYSPARK_SUBMIT_ARGS='--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0 pyspark-shell'
+uv sync --project aws-native/spark --locked --python 3.11
+uv run --project aws-native/spark --locked python -m unittest discover -s aws-native/spark/tests -v
+```
 
 To inspect a no-refresh plan locally with AWS credentials already configured:
 
@@ -109,6 +126,10 @@ before requesting AWS credentials.
   `MaxKeys=1`; IAM permits listing only `bronze/*` and `quarantine/*`. This
   yields an unambiguous missing-object result without treating AccessDenied as
   absence or exposing unrelated bucket keys.
+- The Glue job is absent by default and blocked without a budget recipient.
+  When enabled it uses 2-5 `G.1X` workers, a 10-60 minute timeout, zero retries
+  and concurrency one. Its separate role can read `bronze/` and its own script,
+  but can write only `iceberg/` and the one Silver Glue database.
 - Redshift Serverless is disabled by default, private-only when enabled, capped
   at eight RPUs and blocked unless a budget-alert recipient is supplied.
 - AWS Budgets creates forecasted 80% and actual 100% email alerts when
@@ -117,7 +138,8 @@ before requesting AWS credentials.
 See `runbook.md` before any approved deployment or cleanup.
 
 AWS-02 interview evidence is in `aws-02-interview.md`; exact offline results are
-in `evidence-aws02.md`.
+in `evidence-aws02.md`. AWS-03 evidence and the speakable explanation are in
+`aws-03-interview.md` and `evidence-aws03.md`.
 
 `interval_start`/`interval_end` describe source data, `source_extract_ts` comes
 from the source record, and `ingested_at` is an actual run-start timestamp

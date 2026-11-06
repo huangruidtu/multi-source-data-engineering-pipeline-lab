@@ -25,7 +25,11 @@ results justify **OFFLINE TESTED**, not **AWS RUNTIME VERIFIED**.
 6. PostgreSQL Lambda execution additionally requires approved connectivity to
    the database. AWS-02 does not invent a VPC, subnets, security groups, NAT or
    endpoints; add reviewed networking in a separate approved change.
-7. Run `terraform plan -refresh=false -lock=false` and review every resource.
+7. Leave `enable_glue_silver_job=false` unless a budget recipient is configured,
+   the explicit `_COMMITTED.json` keys are reviewed, and the Glue role's Bronze,
+   `iceberg/`, Catalog, KMS and log scopes match the target account. The job is
+   capped at 2-5 G.1X workers, one concurrent run, zero retries and 60 minutes.
+8. Run `terraform plan -refresh=false -lock=false` and review every resource.
 
 ### Required GitHub environment protection
 
@@ -72,6 +76,10 @@ object, choose a different approved logical identity rather than weakening the
 immutable-key checks.
 Do not label the function runtime verified until an approved AWS smoke test
 proves the layer, networking, secret, source endpoints, KMS and S3 behavior.
+Likewise, Linux HadoopCatalog evidence verifies Spark/Iceberg logic but not Glue
+Catalog, S3FileIO or AWS IAM. Keep AWS-03 at `AWS RUNTIME DEFERRED` until an
+authorized Glue run consumes a real approved manifest and its Catalog snapshot,
+S3 objects and CloudWatch logs are captured.
 
 ## Cleanup
 
