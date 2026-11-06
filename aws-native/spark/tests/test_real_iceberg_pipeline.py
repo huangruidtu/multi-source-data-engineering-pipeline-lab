@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import sys
 import unittest
@@ -13,8 +14,8 @@ from mdep_ingestion.models import BatchContext, SourceRecord, enrich_record
 from mdep_ingestion.object_store import LocalObjectStore
 from mdep_ingestion.publication import BronzePublisher
 from mdep_ingestion.serialization import to_parquet
-from mdep_silver.manifest import verify_committed_batch
-from mdep_silver.spark_job import build_local_spark, process_verified_batch
+from mdep_silver.manifest import ManifestValidationError, verify_committed_batch
+from mdep_silver.spark_job import build_local_spark, create_tables, process_verified_batch
 
 
 UTC = timezone.utc
@@ -73,11 +74,15 @@ class RealIcebergPipelineTests(unittest.TestCase):
         self.assertEqual("ECB", row["provider_name"])
         self.assertIn('"provider_name":"ECB"', row["source_payload_json"])
         self.assertEqual("7.4600000002", str(row["rate"]))
+        schema = {field.name: field.dataType.simpleString() for field in self.spark.table("local.mdep_silver.ref_exchange_rates").schema}
+        self.assertEqual("decimal(20,10)", schema["rate"])
+        snapshots_before_replay = self.spark.sql("SELECT * FROM local.mdep_silver.ref_exchange_rates.snapshots").count()
 
         replay = process_verified_batch(self.spark, first, self.data_path(first))
         self.assertEqual((0, 0, 1), (replay.inserted_count, replay.updated_count, replay.unchanged_count))
         self.assertEqual(3, self.spark.table("local.mdep_silver.silver_quarantine").count())
         self.assertEqual(1, self.spark.table("local.mdep_silver.processing_reconciliation").count())
+        self.assertEqual(snapshots_before_replay, self.spark.sql("SELECT * FROM local.mdep_silver.ref_exchange_rates.snapshots").count())
 
         newer = publish(self.store, batch_context("exchange_rates", 2), [
             {
@@ -130,6 +135,49 @@ class RealIcebergPipelineTests(unittest.TestCase):
         self.assertEqual(1, self.spark.table("local.mdep_silver.ref_locations").count())
         self.assertEqual("hub", self.spark.table("local.mdep_silver.ref_locations").first()["location_type"])
         self.assertEqual(2, len(calls))
+
+        samples = [
+            row.asDict()
+            for row in self.spark.sql(
+                "SELECT rate_date, base_currency, quote_currency, CAST(rate AS STRING) AS rate, provider_name "
+                "FROM local.mdep_silver.ref_exchange_rates ORDER BY quote_currency"
+            ).collect()
+        ]
+        evidence = {
+            "first_reconciliation": json.loads(result.to_json()),
+            "replay_reconciliation": json.loads(replay.to_json()),
+            "newer_reconciliation": json.loads(updated.to_json()),
+            "stale_reconciliation": json.loads(stale_result.to_json()),
+            "silver_rows": samples,
+            "snapshot_operations": [row["operation"] for row in snapshots],
+            "quarantine_rows": self.spark.table("local.mdep_silver.silver_quarantine").count(),
+        }
+        print("AWS03_ICEBERG_EVIDENCE=" + json.dumps(evidence, default=str, sort_keys=True))
+
+    def test_integrity_failures_stop_before_any_silver_write(self):
+        create_tables(self.spark, "local", "mdep_silver")
+        rows_before = self.spark.table("local.mdep_silver.ref_locations").count()
+        root = Path(self.temp.name) / "integrity-objects"
+        store = LocalObjectStore(root)
+        orphan_context = batch_context("locations", 6)
+        orphan = publish(store, orphan_context, [{
+            "location_id": "loc-orphan", "location_name": "Orphan", "country_code": "DK",
+            "timezone": "Europe/Copenhagen", "updated_at": "2026-11-06T08:00:00Z",
+        }])
+        Path(root, orphan.manifest_key).unlink()
+        with self.assertRaisesRegex(ManifestValidationError, "manifest_unreadable"):
+            verify_committed_batch(store, orphan.manifest_key)
+
+        tampered_context = batch_context("locations", 7)
+        tampered = publish(store, tampered_context, [{
+            "location_id": "loc-tampered", "location_name": "Tampered", "country_code": "DK",
+            "timezone": "Europe/Copenhagen", "updated_at": "2026-11-07T08:00:00Z",
+        }])
+        Path(root, tampered.data_key).write_bytes(b"not parquet")
+        with self.assertRaisesRegex(ManifestValidationError, "unreadable"):
+            verify_committed_batch(store, tampered.manifest_key)
+        self.assertEqual(rows_before, self.spark.table("local.mdep_silver.ref_locations").count())
+        print("AWS03_INTEGRITY_EVIDENCE=orphan_rejected,tampered_payload_rejected,no_silver_write")
 
 
 if __name__ == "__main__":
