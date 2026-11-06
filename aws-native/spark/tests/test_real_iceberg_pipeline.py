@@ -16,6 +16,9 @@ from mdep_ingestion.publication import BronzePublisher
 from mdep_ingestion.serialization import to_parquet
 from mdep_silver.manifest import ManifestValidationError, verify_committed_batch
 from mdep_silver.spark_job import build_local_spark, create_tables, deduplicate, process_verified_batch, transform
+from mdep_cdc.dms_adapter import DmsAdapter
+from mdep_cdc.iceberg_writer import apply_iceberg_event, create_cdc_tables
+from mdep_cdc.models import ApplyDecision
 
 
 UTC = timezone.utc
@@ -56,6 +59,105 @@ class RealIcebergPipelineTests(unittest.TestCase):
 
     def data_path(self, verified) -> str:
         return str((self.store.root / verified.data_key).resolve())
+
+    def test_real_dms_cdc_to_iceberg_current_state_tombstone_and_replay(self):
+        adapter = DmsAdapter()
+        namespace = "cdc_correctness"
+        create_cdc_tables(self.spark, namespace=namespace)
+
+        def record(operation, data, lsn=None, txid=None, record_id=None, table="customers"):
+            metadata = {
+                "timestamp": "2026-11-06T10:00:01.000000Z",
+                "record-type": "data",
+                "operation": operation,
+                "partition-key-type": "primary-key",
+                "partition-key-value": str(next(iter(data.values()))),
+                "schema-name": "commerce",
+                "table-name": table,
+                "commit-timestamp": "2026-11-06T10:00:00.000000Z",
+            }
+            if operation != "load":
+                metadata.update({
+                    "stream-position": lsn,
+                    "transaction-id": txid,
+                    "transaction-record-id": record_id,
+                })
+            return adapter.parse({"data": data, "metadata": metadata})
+
+        customer = {
+            "customer_id": "cust-cdc-1", "customer_name": "Ada", "email": "ada@example.test",
+            "customer_status": "active", "created_at": "2026-11-01T08:00:00Z",
+            "updated_at": "2026-11-01T08:00:00Z",
+        }
+        snapshot = record("load", customer)
+        self.assertEqual(ApplyDecision.APPLIED_INSERT, apply_iceberg_event(
+            self.spark, snapshot, namespace=namespace, observed_at=datetime(2026, 11, 6, 10, 1, tzinfo=UTC)
+        ).decision)
+        updated_data = {**customer, "customer_status": "suspended", "updated_at": "2026-11-06T10:02:00Z"}
+        update = record("update", updated_data, "16/B6C60", 731, 1)
+        self.assertEqual(ApplyDecision.APPLIED_UPDATE, apply_iceberg_event(
+            self.spark, update, namespace=namespace, observed_at=datetime(2026, 11, 6, 10, 2, tzinfo=UTC)
+        ).decision)
+        self.assertEqual(ApplyDecision.DUPLICATE, apply_iceberg_event(
+            self.spark, update, namespace=namespace, observed_at=datetime(2026, 11, 6, 11, 0, tzinfo=UTC)
+        ).decision)
+
+        stale_update = record("update", customer, "16/B6C50", 730, 1)
+        stale_delete = record("delete", {"customer_id": "cust-cdc-1"}, "16/B6C55", 730, 2)
+        self.assertEqual(ApplyDecision.STALE, apply_iceberg_event(self.spark, stale_update, namespace=namespace).decision)
+        self.assertEqual(ApplyDecision.STALE, apply_iceberg_event(self.spark, stale_delete, namespace=namespace).decision)
+
+        conflict = record("update", {**updated_data, "customer_status": "inactive"}, "16/B6C60", 731, 1)
+        self.assertEqual(ApplyDecision.CONFLICT, apply_iceberg_event(self.spark, conflict, namespace=namespace).decision)
+        table = f"local.{namespace}.core_customers"
+        self.assertEqual("suspended", self.spark.table(table).first()["customer_status"])
+
+        delete = record("delete", {"customer_id": "cust-cdc-1"}, "16/B6C70", 732, 1)
+        self.assertEqual(ApplyDecision.APPLIED_DELETE, apply_iceberg_event(
+            self.spark, delete, namespace=namespace, observed_at=datetime(2026, 11, 6, 10, 3, tzinfo=UTC)
+        ).decision)
+        self.assertEqual(ApplyDecision.DUPLICATE, apply_iceberg_event(self.spark, delete, namespace=namespace).decision)
+        tombstone = self.spark.table(table).first().asDict()
+        self.assertTrue(tombstone["is_deleted"])
+        self.assertEqual("16/B6C70", tombstone["source_lsn"])
+        self.assertEqual(("commerce", "customers", "cust-cdc-1", "delete"), (
+            tombstone["source_schema"], tombstone["source_table"],
+            tombstone["primary_key_value"], tombstone["dms_operation"],
+        ))
+        self.assertEqual(0, self.spark.table(table).where("not is_deleted").count())
+        self.assertEqual(ApplyDecision.STALE, apply_iceberg_event(self.spark, update, namespace=namespace).decision)
+
+        # Four entity-scoped canonical tables use the Gold-facing field names.
+        fixtures = {
+            "products": {
+                "product_id": "prod-1", "product_name": "Keyboard", "category_code": "HW",
+                "unit_price": "99.50", "currency": "DKK", "updated_at": "2026-11-06T10:00:00Z",
+            },
+            "orders": {
+                "order_id": "order-1", "customer_id": "cust-2", "order_status": "created",
+                "order_ts": "2026-11-06T10:00:00Z", "currency": "EUR", "order_total": "100.00",
+                "updated_at": "2026-11-06T10:00:00Z",
+            },
+            "payments": {
+                "payment_id": "pay-1", "order_id": "order-1", "payment_status": "authorized",
+                "payment_ts": "2026-11-06T10:00:00Z", "amount": "100.00", "currency": "EUR",
+                "authorization_code": "auth-1", "updated_at": "2026-11-06T10:00:00Z",
+            },
+        }
+        for index, (entity, payload) in enumerate(fixtures.items(), 1):
+            result = apply_iceberg_event(
+                self.spark, record("insert", payload, f"16/B6D{index}0", 740 + index, 1, entity),
+                namespace=namespace,
+            )
+            self.assertEqual(ApplyDecision.APPLIED_INSERT, result.decision)
+            self.assertEqual(1, self.spark.table(f"local.{namespace}.core_{entity}").where("not is_deleted").count())
+
+        quarantine = self.spark.table(f"local.{namespace}.cdc_quarantine")
+        self.assertEqual(4, quarantine.count())
+        self.assertEqual(4, quarantine.select("quarantine_id").distinct().count())
+        snapshots = self.spark.sql(f"SELECT operation FROM {table}.snapshots").collect()
+        self.assertGreaterEqual(len(snapshots), 3)
+        self.assertTrue(all(row["operation"] in {"append", "overwrite"} for row in snapshots))
 
     def test_identical_duplicate_occurrences_keep_independent_evidence_on_replay(self):
         context = batch_context("locations", 8)

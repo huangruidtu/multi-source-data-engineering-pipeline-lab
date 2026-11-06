@@ -30,12 +30,16 @@ class GoldContractTests(unittest.TestCase):
         self.assertIn("fx_ingested_at", sql)
         self.assertIn("fx_record_hash", sql)
 
-    def test_fixture_boundary_is_explicit_and_aws05_is_not_claimed(self):
+    def test_fixture_boundary_and_aws05_live_row_filter_are_explicit(self):
         sources = (ROOT / "models" / "sources.yml").read_text()
-        self.assertIn("FUTURE AWS-05 BOUNDARY", sources)
+        self.assertIn("AWS-05 Iceberg v2 current-state ledgers", sources)
         self.assertIn("fixture_*", sources)
         self.assertTrue((ROOT / "seeds" / "fixture_orders.csv").exists())
         self.assertTrue((ROOT / "seeds" / "silver_bridge_exchange_rates.csv").exists())
+        for entity in ("customers", "products", "orders", "payments"):
+            staging = (ROOT / "models" / "staging" / f"stg_{entity}.sql").read_text()
+            self.assertIn("target.type != 'duckdb'", staging)
+            self.assertIn("where not coalesce(is_deleted, false)", staging)
 
     def test_redshift_lake_role_no_longer_reads_bronze(self):
         identity = (REPOSITORY / "aws-native" / "terraform" / "identity.tf").read_text()
