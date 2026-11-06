@@ -229,3 +229,14 @@ variable "redshift_max_capacity_rpus" {
     error_message = "AWS-01 caps Redshift Serverless at 8 RPUs."
   }
 }
+
+variable "redshift_monthly_rpu_hours" {
+  description = "Hard monthly Redshift Serverless compute threshold; reaching it deactivates queries."
+  type        = number
+  default     = 16
+
+  validation {
+    condition     = var.redshift_monthly_rpu_hours >= 8 && var.redshift_monthly_rpu_hours <= 40 && floor(var.redshift_monthly_rpu_hours) == var.redshift_monthly_rpu_hours
+    error_message = "The monthly Redshift limit must be a whole number from 8 through 40 RPU-hours."
+  }
+}

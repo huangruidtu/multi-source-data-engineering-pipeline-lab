@@ -97,6 +97,19 @@ class AwsNativePolicyTests(unittest.TestCase):
         ):
             self.assertIn(required, self.tf)
 
+    def test_redshift_has_hard_compute_deactivation_limit(self):
+        services = (TF_ROOT / "services.tf").read_text(encoding="utf-8")
+        variables = (TF_ROOT / "variables.tf").read_text(encoding="utf-8")
+        identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
+        redshift_policy = identity.split('data "aws_iam_policy_document" "redshift"', 1)[1]
+        self.assertIn('resource "aws_redshiftserverless_usage_limit" "monthly_compute"', services)
+        self.assertRegex(services, r'usage_type\s*=\s*"serverless-compute"')
+        self.assertRegex(services, r'period\s*=\s*"monthly"')
+        self.assertIn('breach_action = "deactivate"', services)
+        self.assertIn('default     = 16', variables)
+        self.assertNotIn('"bronze/*"', redshift_policy)
+        self.assertIn('"iceberg/*"', redshift_policy)
+
     def test_ingestion_lambda_is_explicit_and_least_privilege(self):
         identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
         services = (TF_ROOT / "services.tf").read_text(encoding="utf-8")

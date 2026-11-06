@@ -80,9 +80,34 @@ jobs:
       - name: Run real AWS-02 to Spark to Iceberg integration
         run: uv run --project aws-native/spark --locked python -m unittest discover -s aws-native/spark/tests -v
 
+  gold-dbt-validation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned Gold adapters
+        run: |
+          python -m pip install uv==0.11.21
+          uv sync --project aws-native/gold --locked --python 3.12
+      - name: Check Redshift contracts and Terraform boundary
+        run: uv run --project aws-native/gold --locked python -m unittest discover -s aws-native/gold/tests_python -v
+      - name: Parse the Redshift target without a live connection
+        working-directory: aws-native/gold
+        env:
+          DBT_PROFILES_DIR: .
+        run: uv run --project . --locked dbt parse --target redshift
+      - name: Build and test Gold with stateful DuckDB scenarios
+        run: uv run --project aws-native/gold --locked python aws-native/gold/scripts/run_integration.py
+      - name: Check patch whitespace
+        run: git diff --check
+
   oidc-no-refresh-plan:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_aws_plan }}
-    needs: [offline-validation, real-spark-iceberg]
+    needs: [offline-validation, real-spark-iceberg, gold-dbt-validation]
     runs-on: ubuntu-latest
     environment: aws-sandbox-plan
     permissions:

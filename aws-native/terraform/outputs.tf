@@ -23,6 +23,16 @@ output "redshift_enabled" {
   value       = var.enable_redshift_serverless
 }
 
+output "redshift_connection" {
+  description = "Non-secret dbt connection inputs when the private workgroup is explicitly enabled."
+  value = var.enable_redshift_serverless ? {
+    host     = aws_redshiftserverless_workgroup.platform[0].endpoint[0].address
+    port     = aws_redshiftserverless_workgroup.platform[0].endpoint[0].port
+    database = aws_redshiftserverless_namespace.platform[0].db_name
+    schema   = "gold"
+  } : null
+}
+
 output "ingestion_lambda_enabled" {
   description = "Whether the dependency- and cost-gated AWS-02 Lambda is planned."
   value       = var.enable_ingestion_lambda
