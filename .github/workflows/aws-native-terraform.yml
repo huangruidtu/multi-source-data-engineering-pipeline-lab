@@ -38,13 +38,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install locked AWS-native dependencies
+        working-directory: .
+        run: |
+          python -m pip install uv==0.11.21
+          uv sync --project aws-native --locked --python 3.12
       - run: terraform fmt -check -recursive
       - run: terraform init -backend=false -input=false
       - run: terraform validate
       - run: terraform test -no-color
-      - name: Run Python policy tests
+      - name: Validate Lambda source package
         working-directory: .
-        run: python -m unittest discover -s aws-native/tests -v
+        run: uv run --project aws-native --locked python aws-native/scripts/validate_lambda_package.py
+      - name: Run AWS-native ingestion, Airflow parse and policy tests
+        working-directory: .
+        run: uv run --project aws-native --locked python -m unittest discover -s aws-native/tests -v
 
   oidc-no-refresh-plan:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_aws_plan }}

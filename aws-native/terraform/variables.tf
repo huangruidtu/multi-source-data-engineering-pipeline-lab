@@ -86,6 +86,59 @@ variable "quarantine_retention_days" {
   }
 }
 
+variable "enable_ingestion_lambda" {
+  description = "Explicit cost/runtime switch for the AWS-02 ingestion Lambda. Disabled until dependencies, sources and networking are reviewed."
+  type        = bool
+  default     = false
+}
+
+variable "lambda_dependency_layer_arns" {
+  description = "Reviewed Python 3.12 Lambda layer ARNs containing compatible PyArrow and psycopg binaries."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for arn in var.lambda_dependency_layer_arns : can(regex("^arn:[a-z0-9-]+:lambda:[a-z0-9-]+:[0-9]{12}:layer:[A-Za-z0-9-_]+:[0-9]+$", arn))])
+    error_message = "Every dependency layer must be a versioned Lambda layer ARN."
+  }
+}
+
+variable "postgres_secret_arn" {
+  description = "Exact Secrets Manager ARN containing the PostgreSQL DSN or connection fields."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.postgres_secret_arn == null || can(regex("^arn:[a-z0-9-]+:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$", var.postgres_secret_arn))
+    error_message = "postgres_secret_arn must be null or an exact Secrets Manager secret ARN."
+  }
+}
+
+variable "rest_exchange_rates_url" {
+  description = "HTTPS exchange-rates endpoint supplied to the ingestion runtime."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.rest_exchange_rates_url == null || startswith(var.rest_exchange_rates_url, "https://")
+    error_message = "rest_exchange_rates_url must use HTTPS."
+  }
+}
+
+variable "rest_locations_url" {
+  description = "HTTPS locations endpoint supplied to the ingestion runtime."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.rest_locations_url == null || startswith(var.rest_locations_url, "https://")
+    error_message = "rest_locations_url must use HTTPS."
+  }
+}
+
 variable "monthly_budget_usd" {
   description = "Monthly cost alert threshold. This is not a hard spending limit."
   type        = number

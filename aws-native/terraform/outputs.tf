@@ -23,12 +23,19 @@ output "redshift_enabled" {
   value       = var.enable_redshift_serverless
 }
 
+output "ingestion_lambda_enabled" {
+  description = "Whether the dependency- and cost-gated AWS-02 Lambda is planned."
+  value       = var.enable_ingestion_lambda
+}
+
 output "evidence_status" {
   description = "Honest AWS-01 evidence boundary."
   value = {
-    architecture = "CODED"
-    terraform    = "CODED"
-    validation   = "OFFLINE_TESTED"
-    aws_runtime  = "RUNTIME_DEFERRED"
+    architecture     = "CODED"
+    ingestion        = "CODED"
+    terraform        = "CODED"
+    validation       = "OFFLINE_TESTED"
+    airflow_linux_ci = "OFFLINE_CI_TESTED"
+    aws_runtime      = "RUNTIME_DEFERRED"
   }
 }

@@ -31,7 +31,12 @@ approved engine change while keeping one writer per table.
 ```text
 GitHub Actions --OIDC sub/aud--> plan role --sts:GetCallerIdentity only
 
-Lambda service --assume role--> Lambda role --write--> one CloudWatch log group
+Lambda service --assume role--> Lambda role
+                                      |--read--> source/reference/, Bronze, quarantine
+                                      |--conditional write--> Bronze, quarantine
+                                      |--KMS via S3--> one data key
+                                      |--read--> one PostgreSQL secret
+                                      `--write--> one CloudWatch log group
 
 Redshift service --assume role--> Redshift role
                                       |--read--> bronze/iceberg prefixes
@@ -61,9 +66,11 @@ credentials. Pull-request validation needs no AWS credentials.
 - **S3/KMS:** durable evidence boundary. Default SSE-KMS, TLS-only bucket
   policy, public-access block, ownership enforcement and versioning are all
   explicit resources so a review can see the controls.
-- **Lambda:** small control-plane placeholder, not a data-processing claim. The
-  handler validates an S3 event shape and emits routing metadata; it neither
-  reads nor writes data in AWS-01.
+- **Lambda:** the AWS-02 adapter executes one explicitly supplied source
+  operation through the shared package. It is not connected to an S3 event, so
+  it cannot create a notification loop. Terraform leaves it disabled until a
+  reviewed PyArrow/psycopg layer, source configuration, budget recipient and
+  PostgreSQL connectivity are available.
 - **Glue Catalog:** namespace skeleton for future Iceberg Silver tables. No
   crawler is created because contracts and table ownership are explicit.
 - **Redshift Serverless:** private, encrypted, enhanced-VPC-routing skeleton.
@@ -79,7 +86,11 @@ credentials. Pull-request validation needs no AWS credentials.
 | Accidental public S3 configuration | Public-access block plus TLS-only policy; policy tests fail if controls are removed. |
 | Accidental bucket deletion | Terraform lifecycle rejects destroy and S3 refuses deletion while objects remain. A reviewed two-step change is required. |
 | Compromised GitHub job | Subject/audience trust restriction and a role with no mutation permissions limit blast radius. |
-| Lambda retry storm | Reserved concurrency two, 30-second timeout and no data-plane permission contain cost and writes. |
+| Lambda retry storm | The function is absent by default; when enabled, reserved concurrency two and a 300-second timeout bound cost and data-plane writes. |
+| Source operation retry | The UUIDv5 run identity and conditional object writes make identical replay a verified no-op. |
+| Missing S3 object | The adapter lists the exact target key under an IAM-restricted Bronze/quarantine prefix before HEAD; a list 403 remains a failure, never a false absence. |
+| REST page 3 fails | Extraction finishes all pages before serialization; no canonical data or manifest is written. |
+| Data write succeeds, manifest fails | Data is an invisible orphan; retry verifies the stored Parquet, record count and source-content checksum, then publishes a manifest describing those actual first bytes. |
 | Redshift idle cost | Resource absent by default; when enabled, private networking and max-RPU cap apply. |
 | KMS key deletion | 30-day deletion window and Terraform destroy protection allow recovery before deletion completes. |
 | Bad/late source data | Bronze remains replayable; quarantine retains evidence; later writers must apply existing V1 ordering rules. |
@@ -90,7 +101,29 @@ credentials. Pull-request validation needs no AWS credentials.
 - No remote Terraform state/locking bootstrap.
 - No VPC, NAT gateway or interface endpoints; approved existing private subnets
   are inputs for Redshift to avoid hiding networking cost.
-- No ingestion trigger, Glue job, Iceberg table, Redshift SQL or dbt execution.
+- No automatic ingestion trigger, Glue job, Iceberg table, Redshift SQL or dbt execution.
+- Airflow is authored against its public SDK and parsed in Linux CI. Native
+  Windows is not a supported Airflow runtime; its interval resolver is still
+  tested locally there.
+- Lambda binary dependencies and approved PostgreSQL VPC routing are deployment
+  inputs; neither is fabricated by AWS-02.
+
+## Time semantics
+
+- The logical `[interval_start, interval_end)` selects source data and remains
+  part of deterministic run identity.
+- `source_extract_ts` is the event/update/extraction time supplied by the
+  source record.
+- `ingested_at` is a real operational timestamp captured once when the Airflow
+  DAG run or explicit Lambda invocation begins. Retries reuse that value, so a
+  historical backfill remains truthful without changing Parquet bytes and
+  causing a false publication conflict.
+
+Manifest v2 records both the physical Parquet checksum and an order-independent
+source-content checksum over every row field except `ingested_at`. A retry in
+one DagRun normally matches both. An independent, identical replay may differ
+only in ingestion time and is a verified no-op that preserves the first landing
+time. Any business or other provenance change remains a conflict.
 - Budget notifications are inactive until an email is deliberately supplied.
 - The OIDC provider is account-global; an account with an existing GitHub
   provider should set `create_github_oidc_provider=false` and pass its ARN.

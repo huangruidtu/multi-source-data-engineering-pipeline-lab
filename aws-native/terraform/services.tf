@@ -1,32 +1,59 @@
 data "archive_file" "lambda" {
   type        = "zip"
-  source_file = "${path.module}/../lambda/bronze_dispatcher.py"
-  output_path = "${path.module}/.terraform/bronze_dispatcher.zip"
+  output_path = "${path.module}/.terraform/bronze_ingestion.zip"
+
+  source {
+    content  = file("${path.module}/../lambda/bronze_ingestion.py")
+    filename = "bronze_ingestion.py"
+  }
+
+  dynamic "source" {
+    for_each = fileset("${path.module}/../mdep_ingestion", "*.py")
+    content {
+      content  = file("${path.module}/../mdep_ingestion/${source.value}")
+      filename = "mdep_ingestion/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${local.name_prefix}-bronze-dispatcher"
+  count = var.enable_ingestion_lambda ? 1 : 0
+
+  name              = "/aws/lambda/${local.name_prefix}-bronze-ingestion"
   retention_in_days = 14
 }
 
-resource "aws_lambda_function" "bronze_dispatcher" {
-  function_name = "${local.name_prefix}-bronze-dispatcher"
-  description   = "Validates MDEP Bronze/quarantine S3 event routing metadata"
-  role          = aws_iam_role.lambda.arn
-  handler       = "bronze_dispatcher.handler"
+resource "aws_lambda_function" "bronze_ingestion" {
+  count = var.enable_ingestion_lambda ? 1 : 0
+
+  function_name = "${local.name_prefix}-bronze-ingestion"
+  description   = "Runs one explicitly invoked MDEP source operation through the shared Bronze pipeline"
+  role          = aws_iam_role.lambda[0].arn
+  handler       = "bronze_ingestion.handler"
   runtime       = "python3.12"
 
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
+  layers           = var.lambda_dependency_layer_arns
 
-  memory_size                    = 128
-  timeout                        = 30
+  memory_size                    = 1024
+  timeout                        = 300
   reserved_concurrent_executions = 2
+
+  ephemeral_storage {
+    size = 1024
+  }
 
   environment {
     variables = {
-      DATA_BUCKET   = aws_s3_bucket.data.id
-      GLUE_DATABASE = aws_glue_catalog_database.silver.name
+      MDEP_DATA_BUCKET             = aws_s3_bucket.data.id
+      MDEP_KMS_KEY_ID              = aws_kms_key.data.arn
+      MDEP_POSTGRES_SECRET_ARN     = coalesce(var.postgres_secret_arn, "")
+      MDEP_REST_EXCHANGE_RATES_URL = coalesce(var.rest_exchange_rates_url, "")
+      MDEP_REST_LOCATIONS_URL      = coalesce(var.rest_locations_url, "")
+      MDEP_MAX_PAGES               = "100"
+      MDEP_MAX_RECORDS             = "50000"
+      MDEP_MAX_SOURCE_BYTES        = "10485760"
     }
   }
 

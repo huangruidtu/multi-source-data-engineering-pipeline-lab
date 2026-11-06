@@ -57,8 +57,8 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
-    condition     = aws_lambda_function.bronze_dispatcher.memory_size == 128 && aws_lambda_function.bronze_dispatcher.timeout == 30 && aws_lambda_function.bronze_dispatcher.reserved_concurrent_executions == 2
-    error_message = "Lambda size, timeout and concurrency must remain bounded."
+    condition     = length(aws_lambda_function.bronze_ingestion) == 0
+    error_message = "The ingestion Lambda must be disabled by default."
   }
 
   assert {
@@ -79,6 +79,35 @@ run "secure_and_cost_bounded_defaults" {
   assert {
     condition     = output.evidence_status.aws_runtime == "RUNTIME_DEFERRED"
     error_message = "Offline Terraform must not claim AWS runtime verification."
+  }
+}
+
+run "bounded_ingestion_lambda_when_explicitly_enabled" {
+  command = plan
+
+  variables {
+    allowed_account_ids          = ["123456789012"]
+    budget_alert_email           = "owner@example.com"
+    enable_ingestion_lambda      = true
+    lambda_dependency_layer_arns = ["arn:aws:lambda:eu-west-1:123456789012:layer:mdep-pyarrow-psycopg:1"]
+    postgres_secret_arn          = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/postgres-AbCdEf"
+    rest_exchange_rates_url      = "https://sources.example.test/exchange-rates"
+    rest_locations_url           = "https://sources.example.test/locations"
+  }
+
+  assert {
+    condition     = length(aws_lambda_function.bronze_ingestion) == 1
+    error_message = "Explicitly enabled ingestion must create exactly one Lambda."
+  }
+
+  assert {
+    condition     = aws_lambda_function.bronze_ingestion[0].memory_size == 1024 && aws_lambda_function.bronze_ingestion[0].timeout == 300 && aws_lambda_function.bronze_ingestion[0].reserved_concurrent_executions == 2
+    error_message = "Lambda memory, timeout and concurrency must remain bounded."
+  }
+
+  assert {
+    condition     = length(aws_lambda_function.bronze_ingestion[0].layers) == 1
+    error_message = "The enabled Lambda must use the reviewed binary dependency layer."
   }
 }
 
@@ -134,6 +163,21 @@ run "rejects_redshift_without_budget_recipient" {
     enable_redshift_serverless  = true
     redshift_subnet_ids         = ["subnet-11111111", "subnet-22222222", "subnet-33333333"]
     redshift_security_group_ids = ["sg-11111111"]
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "rejects_ingestion_lambda_without_budget_recipient" {
+  command = plan
+
+  variables {
+    allowed_account_ids          = ["123456789012"]
+    enable_ingestion_lambda      = true
+    lambda_dependency_layer_arns = ["arn:aws:lambda:eu-west-1:123456789012:layer:mdep-pyarrow-psycopg:1"]
+    postgres_secret_arn          = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/postgres-AbCdEf"
+    rest_exchange_rates_url      = "https://sources.example.test/exchange-rates"
+    rest_locations_url           = "https://sources.example.test/locations"
   }
 
   expect_failures = [terraform_data.guardrails]
