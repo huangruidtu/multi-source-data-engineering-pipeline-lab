@@ -109,6 +109,7 @@ def create_tables(spark, catalog: str, namespace: str) -> None:
           manifest_key STRING NOT NULL,
           logical_run_identity STRING NOT NULL,
           logical_date DATE NOT NULL,
+          source_locator STRING NOT NULL,
           original_payload STRING NOT NULL,
           rejection_reason STRING NOT NULL,
           record_hash STRING NOT NULL,
@@ -292,11 +293,21 @@ def _merge_quarantine(spark, rejected, verified: VerifiedBatch, table: str) -> N
     from pyspark.sql import functions as F
 
     evidence = rejected.select(
-        F.sha2(F.concat_ws("|", F.lit(verified.manifest_key), F.col("record_hash"), F.col("rejection_reason")), 256).alias("quarantine_id"),
+        F.sha2(
+            F.to_json(
+                F.struct(
+                    F.lit(verified.manifest_key).alias("manifest_key"),
+                    F.col("source_locator").alias("source_locator"),
+                    F.col("record_hash").alias("record_hash"),
+                    F.col("rejection_reason").alias("rejection_reason"),
+                )
+            ),
+            256,
+        ).alias("quarantine_id"),
         "source_name", "source_entity", F.lit(verified.manifest_key).alias("manifest_key"),
         F.lit(verified.logical_run_identity).alias("logical_run_identity"),
         F.to_date(F.lit(verified.logical_date)).alias("logical_date"),
-        F.col("source_payload_json").alias("original_payload"), "rejection_reason", "record_hash",
+        "source_locator", F.col("source_payload_json").alias("original_payload"), "rejection_reason", "record_hash",
         F.current_timestamp().alias("processed_at"),
     )
     evidence.createOrReplaceTempView("aws03_rejected")

@@ -75,15 +75,16 @@ class RealIcebergPipelineTests(unittest.TestCase):
             namespace="duplicate_occurrences",
         )
         quarantine = self.spark.table("local.duplicate_occurrences.silver_quarantine")
-        evidence = quarantine.select("quarantine_id", "original_payload").collect()
+        evidence = quarantine.select("quarantine_id", "source_locator", "original_payload").collect()
         self.assertEqual(2, len(evidence))
         self.assertEqual(2, len({row["quarantine_id"] for row in evidence}))
         rejected_locators = {
-            json.loads(row["original_payload"])["source_locator"]
+            row["source_locator"]
             for row in evidence
         }
         self.assertEqual(2, len(rejected_locators))
         self.assertTrue(rejected_locators.issubset({"page=1,row=1", "page=1,row=2", "page=1,row=3"}))
+        self.assertTrue(all(row["source_locator"] == json.loads(row["original_payload"])["source_locator"] for row in evidence))
         self.assertEqual((3, 0, 2, 1, 1, 0, 0), (
             first.accepted_count,
             first.rejected_count,
