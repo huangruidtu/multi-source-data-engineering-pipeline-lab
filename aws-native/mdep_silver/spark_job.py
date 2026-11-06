@@ -234,6 +234,7 @@ def deduplicate(checked, entity: str):
                 F.col("source_extract_ts").desc_nulls_last(),
                 F.col("ingested_at").desc_nulls_last(),
                 F.col("record_hash").desc(),
+                F.col("source_locator").asc_nulls_last(),
             )
         ),
     )

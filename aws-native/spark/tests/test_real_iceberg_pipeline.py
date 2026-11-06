@@ -15,7 +15,7 @@ from mdep_ingestion.object_store import LocalObjectStore
 from mdep_ingestion.publication import BronzePublisher
 from mdep_ingestion.serialization import to_parquet
 from mdep_silver.manifest import ManifestValidationError, verify_committed_batch
-from mdep_silver.spark_job import build_local_spark, create_tables, process_verified_batch
+from mdep_silver.spark_job import build_local_spark, create_tables, deduplicate, process_verified_batch, transform
 
 
 UTC = timezone.utc
@@ -68,6 +68,15 @@ class RealIcebergPipelineTests(unittest.TestCase):
         }
         verified = publish(self.store, context, [identical, identical, identical])
 
+        from pyspark.sql import functions as F
+
+        checked = transform(self.spark.read.parquet(self.data_path(verified)), verified)
+        for seed in (7, 19):
+            shuffled = checked.orderBy(F.rand(seed)).repartition(3)
+            winners, _rejected, duplicate_count = deduplicate(shuffled, "locations")
+            self.assertEqual(2, duplicate_count)
+            self.assertEqual("page=1,row=1", winners.select("source_locator").first()["source_locator"])
+
         first = process_verified_batch(
             self.spark,
             verified,
@@ -83,7 +92,7 @@ class RealIcebergPipelineTests(unittest.TestCase):
             for row in evidence
         }
         self.assertEqual(2, len(rejected_locators))
-        self.assertTrue(rejected_locators.issubset({"page=1,row=1", "page=1,row=2", "page=1,row=3"}))
+        self.assertEqual({"page=1,row=2", "page=1,row=3"}, rejected_locators)
         self.assertTrue(all(row["source_locator"] == json.loads(row["original_payload"])["source_locator"] for row in evidence))
         self.assertEqual((3, 0, 2, 1, 1, 0, 0), (
             first.accepted_count,
@@ -94,7 +103,9 @@ class RealIcebergPipelineTests(unittest.TestCase):
             first.updated_count,
             first.unchanged_count,
         ))
-        self.assertEqual(1, self.spark.table("local.duplicate_occurrences.ref_locations").count())
+        silver = self.spark.table("local.duplicate_occurrences.ref_locations")
+        self.assertEqual(1, silver.count())
+        self.assertEqual("page=1,row=1", silver.select("source_locator").first()["source_locator"])
 
         replay = process_verified_batch(
             self.spark,
@@ -105,6 +116,10 @@ class RealIcebergPipelineTests(unittest.TestCase):
         replay_evidence = self.spark.table("local.duplicate_occurrences.silver_quarantine")
         self.assertEqual(2, replay_evidence.count())
         self.assertEqual(2, replay_evidence.select("quarantine_id").distinct().count())
+        self.assertEqual(
+            {row["quarantine_id"] for row in evidence},
+            {row["quarantine_id"] for row in replay_evidence.select("quarantine_id").collect()},
+        )
         self.assertEqual((3, 0, 2, 1, 0, 0, 1), (
             replay.accepted_count,
             replay.rejected_count,
