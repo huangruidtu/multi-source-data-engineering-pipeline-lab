@@ -114,7 +114,9 @@ class RealIcebergPipelineTests(unittest.TestCase):
         self.assertEqual("7.4800000004", final_rate)
         self.assertEqual(2, self.spark.table("local.mdep_silver.ref_exchange_rates").count())
 
-        snapshots = self.spark.sql("SELECT operation FROM local.mdep_silver.ref_exchange_rates.snapshots").collect()
+        snapshots = self.spark.sql(
+            "SELECT operation FROM local.mdep_silver.ref_exchange_rates.snapshots ORDER BY committed_at"
+        ).collect()
         self.assertGreaterEqual(len(snapshots), 2)
         self.assertTrue(all(row["operation"] in {"append", "overwrite"} for row in snapshots))
 

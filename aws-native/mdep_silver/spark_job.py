@@ -267,6 +267,13 @@ def _merge_business(spark, winners, entity: str, table: str) -> tuple[int, int, 
         F.when(missing, "insert").when(newer, "update").otherwise("unchanged").alias("outcome")
     ).groupBy("outcome").count().collect()
     outcome_counts = {row["outcome"]: row["count"] for row in counts}
+    inserted = outcome_counts.get("insert", 0)
+    updated = outcome_counts.get("update", 0)
+    unchanged = outcome_counts.get("unchanged", 0)
+    # Iceberg may commit an empty MERGE snapshot even when no clause changes a
+    # row. Avoid invoking MERGE for an exact/stale replay after classification.
+    if inserted == 0 and updated == 0:
+        return inserted, updated, unchanged
     winners.createOrReplaceTempView("aws03_incoming")
     key_sql = " AND ".join(f"t.{key} = s.{key}" for key in keys)
     columns = winners.columns
@@ -278,7 +285,7 @@ def _merge_business(spark, winners, entity: str, table: str) -> tuple[int, int, 
         WHEN MATCHED AND {_newer_sql(entity)} THEN UPDATE SET {update_sql}
         WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})"""
     )
-    return outcome_counts.get("insert", 0), outcome_counts.get("update", 0), outcome_counts.get("unchanged", 0)
+    return inserted, updated, unchanged
 
 
 def _merge_quarantine(spark, rejected, verified: VerifiedBatch, table: str) -> None:
