@@ -10,7 +10,7 @@ from pathlib import Path
 AWS_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(AWS_ROOT))
 
-from mdep_ingestion.models import BatchContext, SourceRecord, canonical_json_bytes, enrich_record, sha256_hex
+from mdep_ingestion.models import BatchContext, SourceRecord, canonical_json_bytes, enrich_record
 from mdep_ingestion.object_store import LocalObjectStore
 from mdep_ingestion.publication import BronzePublisher
 from mdep_ingestion.serialization import to_parquet
@@ -85,4 +85,3 @@ class Aws03ManifestTests(unittest.TestCase):
         path.write_bytes(canonical_json_bytes(manifest))
         with self.assertRaisesRegex(ManifestValidationError, "fields"):
             verify_committed_batch(self.store, self.ctx.manifest_key)
-
