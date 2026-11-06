@@ -57,6 +57,64 @@ class RealIcebergPipelineTests(unittest.TestCase):
     def data_path(self, verified) -> str:
         return str((self.store.root / verified.data_key).resolve())
 
+    def test_identical_duplicate_occurrences_keep_independent_evidence_on_replay(self):
+        context = batch_context("locations", 8)
+        identical = {
+            "location_id": "loc-three",
+            "location_name": "Three Identical Occurrences",
+            "country_code": "DK",
+            "timezone": "Europe/Copenhagen",
+            "updated_at": "2026-11-08T08:00:00Z",
+        }
+        verified = publish(self.store, context, [identical, identical, identical])
+
+        first = process_verified_batch(
+            self.spark,
+            verified,
+            self.data_path(verified),
+            namespace="duplicate_occurrences",
+        )
+        quarantine = self.spark.table("local.duplicate_occurrences.silver_quarantine")
+        evidence = quarantine.select("quarantine_id", "original_payload").collect()
+        self.assertEqual(2, len(evidence))
+        self.assertEqual(2, len({row["quarantine_id"] for row in evidence}))
+        rejected_locators = {
+            json.loads(row["original_payload"])["source_locator"]
+            for row in evidence
+        }
+        self.assertEqual(2, len(rejected_locators))
+        self.assertTrue(rejected_locators.issubset({"page=1,row=1", "page=1,row=2", "page=1,row=3"}))
+        self.assertEqual((3, 0, 2, 1, 1, 0, 0), (
+            first.accepted_count,
+            first.rejected_count,
+            first.duplicate_count,
+            first.unique_winner_count,
+            first.inserted_count,
+            first.updated_count,
+            first.unchanged_count,
+        ))
+        self.assertEqual(1, self.spark.table("local.duplicate_occurrences.ref_locations").count())
+
+        replay = process_verified_batch(
+            self.spark,
+            verified,
+            self.data_path(verified),
+            namespace="duplicate_occurrences",
+        )
+        replay_evidence = self.spark.table("local.duplicate_occurrences.silver_quarantine")
+        self.assertEqual(2, replay_evidence.count())
+        self.assertEqual(2, replay_evidence.select("quarantine_id").distinct().count())
+        self.assertEqual((3, 0, 2, 1, 0, 0, 1), (
+            replay.accepted_count,
+            replay.rejected_count,
+            replay.duplicate_count,
+            replay.unique_winner_count,
+            replay.inserted_count,
+            replay.updated_count,
+            replay.unchanged_count,
+        ))
+        self.assertEqual(1, self.spark.table("local.duplicate_occurrences.ref_locations").count())
+
     def test_real_bronze_manifest_to_iceberg_merge_replay_and_recovery(self):
         rates = [
             {"rate_date": "2026-11-01", "base_currency": "eur", "quote_currency": "dkk", "rate": "7.4500000001", "retrieved_at": "2026-11-01T05:00:00Z"},
