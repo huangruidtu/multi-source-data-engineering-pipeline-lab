@@ -28,6 +28,11 @@ output "ingestion_lambda_enabled" {
   value       = var.enable_ingestion_lambda
 }
 
+output "glue_silver_job_enabled" {
+  description = "Whether the cost-gated AWS-03 Glue 5.1 job is planned."
+  value       = var.enable_glue_silver_job
+}
+
 output "evidence_status" {
   description = "Honest AWS-01 evidence boundary."
   value = {
@@ -36,6 +41,7 @@ output "evidence_status" {
     terraform        = "CODED"
     validation       = "OFFLINE_TESTED"
     airflow_linux_ci = "OFFLINE_CI_TESTED"
+    spark_iceberg    = "LOCAL_LINUX_CI_TESTED"
     aws_runtime      = "RUNTIME_DEFERRED"
   }
 }

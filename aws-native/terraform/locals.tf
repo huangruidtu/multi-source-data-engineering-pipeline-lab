@@ -55,5 +55,9 @@ resource "terraform_data" "guardrails" {
       condition     = !var.enable_ingestion_lambda || var.budget_alert_email != null
       error_message = "Ingestion Lambda requires budget_alert_email before paid compute is enabled."
     }
+    precondition {
+      condition     = !var.enable_glue_silver_job || var.budget_alert_email != null
+      error_message = "The Glue Silver job requires budget_alert_email before paid workers are enabled."
+    }
   }
 }

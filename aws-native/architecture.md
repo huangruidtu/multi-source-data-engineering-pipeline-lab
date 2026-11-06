@@ -38,6 +38,13 @@ Lambda service --assume role--> Lambda role
                                       |--read--> one PostgreSQL secret
                                       `--write--> one CloudWatch log group
 
+Glue service --assume role--> AWS-03 Silver role
+                                      |--read--> explicit bronze manifests/data + own script
+                                      |--write/delete--> iceberg/ only
+                                      |--manage--> one Silver Glue database/tables
+                                      |--KMS via S3--> one data key
+                                      `--write--> one CloudWatch log group
+
 Redshift service --assume role--> Redshift role
                                       |--read--> bronze/iceberg prefixes
                                       |--read--> one Glue database/tables
@@ -71,8 +78,10 @@ credentials. Pull-request validation needs no AWS credentials.
   it cannot create a notification loop. Terraform leaves it disabled until a
   reviewed PyArrow/psycopg layer, source configuration, budget recipient and
   PostgreSQL connectivity are available.
-- **Glue Catalog:** namespace skeleton for future Iceberg Silver tables. No
-  crawler is created because contracts and table ownership are explicit.
+- **Glue Spark and Catalog:** an opt-in Glue 5.1 job runs the same transformation
+  module tested with local HadoopCatalog. The AWS configuration uses
+  GlueCatalog/S3FileIO and built-in Iceberg 1.10.0. No crawler is created because
+  contracts and table ownership are explicit.
 - **Redshift Serverless:** private, encrypted, enhanced-VPC-routing skeleton.
   It is disabled by default to prevent idle spend and does not claim a working
   SQL/dbt path.
@@ -91,22 +100,28 @@ credentials. Pull-request validation needs no AWS credentials.
 | Missing S3 object | The adapter lists the exact target key under an IAM-restricted Bronze/quarantine prefix before HEAD; a list 403 remains a failure, never a false absence. |
 | REST page 3 fails | Extraction finishes all pages before serialization; no canonical data or manifest is written. |
 | Data write succeeds, manifest fails | Data is an invisible orphan; retry verifies the stored Parquet, record count and source-content checksum, then publishes a manifest describing those actual first bytes. |
+| Bronze manifest or Parquet is corrupt | AWS-03 verifies versions, identity, path, row count and both checksums before creating any Silver write plan; the run fails closed. |
+| Silver commit succeeds, acknowledgment fails | Re-run sees the committed Iceberg state: exact rows are unchanged, quarantine and reconciliation use deterministic MERGE keys, then acknowledgment can be retried. No cross-table transaction is claimed. |
+| Older reference data arrives later | MERGE compares business version, source extraction time and ingestion time in that order; an older business version cannot win because of arrival time or hash. |
 | Redshift idle cost | Resource absent by default; when enabled, private networking and max-RPU cap apply. |
 | KMS key deletion | 30-day deletion window and Terraform destroy protection allow recovery before deletion completes. |
 | Bad/late source data | Bronze remains replayable; quarantine retains evidence; later writers must apply existing V1 ordering rules. |
 
-## Deliberate gaps after AWS-01
+## Deliberate gaps after AWS-03
 
 - No AWS account/runtime validation and no `terraform apply` evidence.
 - No remote Terraform state/locking bootstrap.
 - No VPC, NAT gateway or interface endpoints; approved existing private subnets
   are inputs for Redshift to avoid hiding networking cost.
-- No automatic ingestion trigger, Glue job, Iceberg table, Redshift SQL or dbt execution.
+- No automatic AWS Glue trigger, Redshift SQL or dbt execution. The Glue job
+  requires an explicit controlled list of `_COMMITTED.json` keys at invocation.
 - Airflow is authored against its public SDK and parsed in Linux CI. Native
   Windows is not a supported Airflow runtime; its interval resolver is still
   tested locally there.
 - Lambda binary dependencies and approved PostgreSQL VPC routing are deployment
   inputs; neither is fabricated by AWS-02.
+- Glue AWS runtime, IAM and S3FileIO behavior remain deployment-deferred. The
+  Spark logic and real Iceberg commits are verified on Linux CI, not on AWS.
 
 ## Time semantics
 

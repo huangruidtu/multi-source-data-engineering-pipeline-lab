@@ -53,10 +53,36 @@ jobs:
       - name: Run AWS-native ingestion, Airflow parse and policy tests
         working-directory: .
         run: uv run --project aws-native --locked python -m unittest discover -s aws-native/tests -v
+      - name: Run original MDEP V1 regressions
+        working-directory: .
+        run: uv run --project aws-native --locked python -m unittest discover -s tests -v
+
+  real-spark-iceberg:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: aws-native
+      PYSPARK_SUBMIT_ARGS: --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0 pyspark-shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install locked Glue-compatible Spark dependencies
+        run: |
+          python -m pip install uv==0.11.21
+          uv sync --project aws-native/spark --locked --python 3.11
+      - name: Run real AWS-02 to Spark to Iceberg integration
+        run: uv run --project aws-native/spark --locked python -m unittest discover -s aws-native/spark/tests -v
 
   oidc-no-refresh-plan:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_aws_plan }}
-    needs: offline-validation
+    needs: [offline-validation, real-spark-iceberg]
     runs-on: ubuntu-latest
     environment: aws-sandbox-plan
     permissions:

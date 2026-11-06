@@ -139,6 +139,34 @@ variable "rest_locations_url" {
   }
 }
 
+variable "enable_glue_silver_job" {
+  description = "Explicit cost/runtime switch for the AWS-03 Glue 5.1 Spark job."
+  type        = bool
+  default     = false
+}
+
+variable "glue_silver_workers" {
+  description = "Bounded G.1X workers for the interview-scale AWS-03 job."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.glue_silver_workers >= 2 && var.glue_silver_workers <= 5
+    error_message = "AWS-03 permits 2-5 G.1X workers."
+  }
+}
+
+variable "glue_silver_timeout_minutes" {
+  description = "Hard timeout for one AWS-03 run."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.glue_silver_timeout_minutes >= 10 && var.glue_silver_timeout_minutes <= 60
+    error_message = "AWS-03 timeout must remain between 10 and 60 minutes."
+  }
+}
+
 variable "monthly_budget_usd" {
   description = "Monthly cost alert threshold. This is not a hard spending limit."
   type        = number
