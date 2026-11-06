@@ -82,6 +82,63 @@ def main() -> None:
     if before_replay != after_replay:
         raise AssertionError("Exact replay changed fct_orders")
 
+    # AWS-03 can accept a corrected rate at the same business retrieved_at when
+    # source extraction/ingestion provenance is newer. Gold must observe the
+    # same authoritative ordering even when the order itself is unchanged.
+    execute("""
+      update fixture_bridge.silver_bridge_exchange_rates
+         set rate=7.5000000000,
+             source_extract_ts='2025-02-01 07:00:00',
+             ingested_at='2025-02-01 07:05:00',
+             record_hash='rate-eur-dkk-20250201-v2'
+       where rate_date='2025-02-01' and base_currency='EUR' and quote_currency='DKK'
+    """)
+    run("run", "--select", "fct_orders+")
+    same_version_fx = rows(
+        "select order_total_dkk from gold.fct_orders where order_id='ord-100'"
+    )[0]["order_total_dkk"]
+    if str(same_version_fx) != "750.00":
+        raise AssertionError(
+            f"Same-retrieved_at newer-provenance FX correction was skipped: {same_version_fx}"
+        )
+    same_version_mart = rows("""
+      select converted_sales_dkk
+      from gold.mart_daily_sales
+      where order_date='2025-02-01' and source_currency='EUR'
+    """)[0]["converted_sales_dkk"]
+    if str(same_version_mart) != "750.00":
+        raise AssertionError(f"FX correction did not reach downstream mart: {same_version_mart}")
+
+    execute("""
+      update fixture_bridge.silver_bridge_exchange_rates
+         set rate=9.9900000000,
+             source_extract_ts='2025-02-01 06:30:00',
+             ingested_at='2025-02-01 06:35:00',
+             record_hash='rate-eur-dkk-20250201-stale'
+       where rate_date='2025-02-01' and base_currency='EUR' and quote_currency='DKK'
+    """)
+    run("run", "--select", "fct_orders+")
+    stale_fx = rows(
+        "select order_total_dkk from gold.fct_orders where order_id='ord-100'"
+    )[0]["order_total_dkk"]
+    stale_fx_mart = rows("""
+      select converted_sales_dkk
+      from gold.mart_daily_sales
+      where order_date='2025-02-01' and source_currency='EUR'
+    """)[0]["converted_sales_dkk"]
+    if str(stale_fx) != "750.00" or str(stale_fx_mart) != "750.00":
+        raise AssertionError(
+            f"Stale FX overwrote newer Gold state: fact={stale_fx}, mart={stale_fx_mart}"
+        )
+    execute("""
+      update fixture_bridge.silver_bridge_exchange_rates
+         set rate=7.5000000000,
+             source_extract_ts='2025-02-01 07:00:00',
+             ingested_at='2025-02-01 07:05:00',
+             record_hash='rate-eur-dkk-20250201-v2'
+       where rate_date='2025-02-01' and base_currency='EUR' and quote_currency='DKK'
+    """)
+
     execute("""
       insert into fixture_bridge.fixture_orders values
         ('ord-400','cust-100','created','2025-02-03 09:00:00','DKK',25.00,
@@ -156,9 +213,11 @@ def main() -> None:
         raise AssertionError("Downstream marts did not reconcile after the verified delete")
     evidence({
         "classification": "LOCAL_DUCKDB_FIXTURE_BRIDGE_VERIFIED",
-        "mutations": {"inserted": 1, "updated": 1, "deleted": 1, "fx_corrected": 1},
+        "mutations": {"inserted": 1, "updated": 1, "deleted": 1, "fx_corrected": 2},
         "exact_replay_changed_rows": 0,
         "stale_replay_changed_rows": 0,
+        "same_retrieved_at_fx_corrected_rows": 1,
+        "stale_fx_changed_rows": 0,
         "partial_feed_deleted_rows": 0,
         "delete_guards": {"snapshot_proof_required": True, "mass_delete_blocked": True},
         "initial_orders": initial_orders,

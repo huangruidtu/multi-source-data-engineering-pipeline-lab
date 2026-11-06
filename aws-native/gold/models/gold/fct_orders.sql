@@ -21,6 +21,8 @@ with candidates as (
     o.missing_dkk_rate,
     o.orphan_customer,
     o.fx_retrieved_at,
+    o.fx_source_extract_ts,
+    o.fx_ingested_at,
     o.fx_record_hash,
     o.updated_at as source_updated_at,
     o.source_lsn,
@@ -37,17 +39,42 @@ where not exists (
   select 1
   from {{ this }} current_row
   where current_row.order_id = incoming.order_id
-    and (
-      current_row.source_updated_at > incoming.source_updated_at
+    and not (
+      incoming.source_updated_at > current_row.source_updated_at
       or (
-        current_row.source_updated_at = incoming.source_updated_at
-        and current_row.source_applied_at > incoming.source_applied_at
+        incoming.source_updated_at = current_row.source_updated_at
+        and incoming.source_applied_at > current_row.source_applied_at
       )
       or (
-        current_row.source_updated_at = incoming.source_updated_at
-        and current_row.source_applied_at = incoming.source_applied_at
-        and coalesce(current_row.fx_retrieved_at, cast('1900-01-01' as timestamp))
-            >= coalesce(incoming.fx_retrieved_at, cast('1900-01-01' as timestamp))
+        incoming.source_updated_at = current_row.source_updated_at
+        and incoming.source_applied_at = current_row.source_applied_at
+        and (
+          coalesce(incoming.fx_retrieved_at, cast('1900-01-01' as timestamp))
+            > coalesce(current_row.fx_retrieved_at, cast('1900-01-01' as timestamp))
+          or (
+            coalesce(incoming.fx_retrieved_at, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_retrieved_at, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+              > coalesce(current_row.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+          )
+          or (
+            coalesce(incoming.fx_retrieved_at, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_retrieved_at, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_ingested_at, cast('1900-01-01' as timestamp))
+              > coalesce(current_row.fx_ingested_at, cast('1900-01-01' as timestamp))
+          )
+          or (
+            coalesce(incoming.fx_retrieved_at, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_retrieved_at, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_source_extract_ts, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_ingested_at, cast('1900-01-01' as timestamp))
+              = coalesce(current_row.fx_ingested_at, cast('1900-01-01' as timestamp))
+            and coalesce(incoming.fx_record_hash, '') > coalesce(current_row.fx_record_hash, '')
+          )
+        )
       )
     )
 )

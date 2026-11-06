@@ -26,6 +26,9 @@ class GoldContractTests(unittest.TestCase):
         self.assertNotIn("post_hook", sql)
         self.assertIn("source_updated_at", sql)
         self.assertIn("fx_retrieved_at", sql)
+        self.assertIn("fx_source_extract_ts", sql)
+        self.assertIn("fx_ingested_at", sql)
+        self.assertIn("fx_record_hash", sql)
 
     def test_fixture_boundary_is_explicit_and_aws05_is_not_claimed(self):
         sources = (ROOT / "models" / "sources.yml").read_text()

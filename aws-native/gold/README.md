@@ -21,8 +21,9 @@ uv run --project aws-native/gold --locked python aws-native/gold/scripts/run_int
 ```
 
 The integration command performs a full seed/build/test and then verifies exact
-replay, new and updated orders, stale replay, a Type 1 customer change, an FX
-correction, partial-feed safety, a verified delete and mass-delete rejection.
+replay, new and updated orders, stale replay, a Type 1 customer change, FX
+corrections including equal-`retrieved_at` provenance ordering, partial-feed
+safety, a verified delete and mass-delete rejection.
 It prints one machine-readable `AWS04_GOLD_EVIDENCE` record.
 
 ## Redshift handoff

@@ -19,8 +19,11 @@ Observed initial orders:
 | `ord-200` | DKK 50.00 | 50.00 | missing customer retained |
 | `ord-300` | EUR 30.00 | null | missing rate retained and flagged |
 
-The incremental scenarios observed one insert, one newer update, one FX
-correction and one explicitly verified hard delete. Exact replay and stale
+The incremental scenarios observed one insert, one newer order update, two FX
+corrections and one explicitly verified hard delete. One FX correction retained
+the same `retrieved_at` but carried newer AWS-03 extraction/ingestion provenance;
+EUR 100.00 changed from DKK 748.00 to 750.00 in both fact and daily mart. A 9.99
+rate with older provenance changed neither. Exact order replay and stale order
 replay each changed zero logical rows. Removing an order from an ordinary feed
 deleted zero rows. The delete operation failed without snapshot proof, accepted
 a 25% verified delete, and rejected a 100% mass-delete attempt.
@@ -28,7 +31,7 @@ a 25% verified delete, and rejected a 100% mass-delete attempt.
 Final current-state reconciliation was three source keys and three Gold keys,
 zero source/Gold duplicate keys, one customer orphan, zero missing FX after the
 correction, DKK source total 50.00, EUR source total 140.00, and known converted
-total DKK 1,097.80. Daily sales remained grouped by date and source currency.
+total DKK 1,100.00. Daily sales remained grouped by date and source currency.
 
 ## Redshift and infrastructure evidence
 

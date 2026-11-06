@@ -2,7 +2,14 @@ with orders as (
   select * from {{ ref('stg_orders') }}
 ),
 rates as (
-  select rate_date, base_currency, rate, retrieved_at, record_hash as fx_record_hash
+  select
+    rate_date,
+    base_currency,
+    rate,
+    retrieved_at,
+    source_extract_ts as fx_source_extract_ts,
+    ingested_at as fx_ingested_at,
+    record_hash as fx_record_hash
   from {{ ref('stg_exchange_rates') }}
   where quote_currency = 'DKK' and rate > 0
 ),
@@ -13,6 +20,8 @@ select
   o.*,
   r.rate as dkk_rate,
   r.retrieved_at as fx_retrieved_at,
+  r.fx_source_extract_ts,
+  r.fx_ingested_at,
   r.fx_record_hash,
   {{ amount_in_dkk('o.order_total', 'o.currency', 'r.rate') }} as order_total_dkk,
   case when o.currency <> 'DKK' and r.rate is null then true else false end as missing_dkk_rate,
