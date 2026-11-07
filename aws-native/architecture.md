@@ -159,3 +159,17 @@ key, business payload, durable deletion marker, source LSN/transaction order and
 applied/ingested provenance commit in one MERGE. Gold filters `is_deleted`; the
 checkpoint remains available to reject stale resurrection. See ADR-0003 for the
 ordering and ambiguity policy.
+
+## AWS-06 reusable platform layer
+
+The source registry is a control-plane document. Its runner selects an existing
+extractor and feeds the existing data-plane contracts; it does not own storage,
+serialization or Silver. One enabled `(source_type, source_entity)` owns one
+deterministic identity namespace. Devices stop at committed Bronze because
+AWS-03's current ownership is still exchange rates and locations.
+
+All execution surfaces use `mdep-execution-event-v1`: component/action, source
+and run identities, status, bounded counts/duration, safe error code, manifest
+reference and event time. Lambda/Glue stdout reaches their existing log groups.
+Optional Lambda filters create status-only custom metrics; AWS-05 service alarms
+remain separate and are not duplicated.

@@ -123,3 +123,31 @@ Raw records belong under `bronze/cdc/<entity>/...`; Firehose errors belong under
 `bronze/cdc-errors/...`. They are newline-delimited DMS records, not AWS-02
 Parquet/manifest batches. The canonical writer is a separate Kinesis consumer
 boundary and must be deployed only in a separately reviewed change.
+
+## AWS-06 onboarding, recovery and cleanup preview
+
+Review `config/source-registry.json` against the bundled JSON Schema. A file path
+must stay under `source-data/files/` (or the bounded AWS-native test-fixture
+root); a REST entry stores only an environment
+variable name and an allowlisted host. Never add passwords, tokens or connection
+strings. One enabled type/entity pair prevents ambiguous Bronze identities.
+
+Use `run_platform_demo.py` before review. For a failed extraction, retain the
+quarantine object and fix the source/config; no commit exists. For an orphaned
+data object, repeat the exact source/type/entity/logical date and half-open
+interval so the same UUID completes the manifest. Never invent a retry UUID.
+Reprocess only an explicit `_COMMITTED.json` through the verification helper.
+Conflicts require source/evidence review; do not overwrite immutable Bronze.
+CDC incidents continue to follow the AWS-05 LSN/tombstone procedure.
+
+`enable_platform_observability` defaults false and is rejected unless the
+ingestion Lambda and budget recipient are configured. The three filters match
+only event version and `failed`, `conflicted` or `quarantined` status; alarms use
+`notBreaching` for missing data. These are planned controls, not live evidence.
+
+Run the inventory command before any cleanup. It reports configuration and
+qualitative cost assumptions only. Stop producers, disable opt-in resources in
+a reviewed plan, export evidence, then seek separate approval for each exact
+destructive target. Never automatically delete S3/Iceberg data, KMS keys,
+Terraform state or evidence. Treat an existing OIDC provider as shared until
+ownership is proven.

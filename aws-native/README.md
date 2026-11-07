@@ -173,3 +173,11 @@ newline-delimited S3 archive. The Iceberg writer owns `core_customers`,
 `core_products`, `core_orders`, and `core_payments`; deletes remain durable
 tombstones and Gold staging exposes only live rows. See `aws-05-interview.md`,
 `evidence-aws05.md`, and ADR-0003. No AWS-05 resource is deployed by CI.
+
+AWS-06 adds a strict JSON source registry around the existing pipeline. The
+`devices-json-reference` example proves config-to-Parquet-to-commit-manifest,
+replay, backfill, quarantine, conflict and interrupted-manifest recovery without
+adding a Silver writer. `mdep-execution-event-v1` supplies safe JSON events;
+opt-in filters reuse the Lambda log group without widening IAM or OIDC. Run
+`scripts/run_platform_demo.py`; see `aws-06-interview.md`, `evidence-aws06.md`
+and ADR-0004.
