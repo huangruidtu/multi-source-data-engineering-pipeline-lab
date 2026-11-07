@@ -1,5 +1,5 @@
 with source_rows as (
-  {% if target.type == 'duckdb' %}
+  {% if target.type == 'duckdb' and env_var('MDEP_GOLD_INPUT_MODE', 'fixture') == 'fixture' %}
   select * from {{ ref('fixture_orders') }}
   {% else %}
   select * from {{ source('cdc_silver', 'core_orders') }}
@@ -19,6 +19,6 @@ select
   cast(ingested_at as timestamp) as ingested_at,
   cast(record_hash as varchar) as record_hash
 from source_rows
-{% if target.type != 'duckdb' %}
+{% if target.type != 'duckdb' or env_var('MDEP_GOLD_INPUT_MODE', 'fixture') == 'integrated' %}
 where not coalesce(is_deleted, false)
 {% endif %}

@@ -110,9 +110,41 @@ jobs:
       - name: Check patch whitespace
         run: git diff --check
 
+  integrated-local-demo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: aws-native
+      PYSPARK_SUBMIT_ARGS: --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0 pyspark-shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install locked Spark and Iceberg environment
+        run: |
+          python -m pip install uv==0.11.21
+          uv sync --project aws-native/spark --locked --python 3.11
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install separate locked Gold environment
+        run: |
+          python -m pip install uv==0.11.21
+          uv sync --project aws-native/gold --locked --python 3.12
+      - name: Run the real Iceberg-to-dbt integrated demo
+        run: uv run --project aws-native/spark --locked python aws-native/integration/run_demo.py
+      - name: Check patch whitespace
+        run: git diff --check
+
   oidc-no-refresh-plan:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_aws_plan }}
-    needs: [offline-validation, real-spark-iceberg, gold-dbt-validation]
+    needs: [offline-validation, real-spark-iceberg, gold-dbt-validation, integrated-local-demo]
     runs-on: ubuntu-latest
     environment: aws-sandbox-plan
     permissions:

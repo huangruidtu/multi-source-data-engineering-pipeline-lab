@@ -36,6 +36,32 @@ class GoldContractTests(unittest.TestCase):
         self.assertIn("fixture_*", sources)
         self.assertTrue((ROOT / "seeds" / "fixture_orders.csv").exists())
         self.assertTrue((ROOT / "seeds" / "silver_bridge_exchange_rates.csv").exists())
+
+    def test_integrated_duckdb_mode_uses_only_real_silver_sources(self):
+        staging = list((ROOT / "models" / "staging").glob("stg_*.sql"))
+        self.assertEqual(6, len(staging))
+        for path in staging:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("MDEP_GOLD_INPUT_MODE", text, path.name)
+            self.assertIn("source(", text, path.name)
+        for name in ("customers", "products", "orders", "payments"):
+            text = (ROOT / "models" / "staging" / f"stg_{name}.sql").read_text(encoding="utf-8")
+            self.assertIn("where not coalesce(is_deleted, false)", text)
+
+    def test_verified_tombstone_delete_never_infers_absence(self):
+        macro = (ROOT / "macros" / "apply_verified_order_tombstones.sql").read_text(encoding="utf-8")
+        self.assertIn("cdc_tombstones_verified=true", macro)
+        self.assertIn("coalesce(tombstone.is_deleted, false)", macro)
+        self.assertIn("lower(tombstone.dms_operation) = 'delete'", macro)
+        self.assertIn("tombstone.source_lsn is not null", macro)
+        self.assertNotIn("not exists", macro.lower())
+
+    def test_integrated_harness_has_no_fixture_or_seed_fallback(self):
+        harness = (ROOT / "scripts" / "run_integrated.py").read_text(encoding="utf-8")
+        self.assertIn('"MDEP_GOLD_INPUT_MODE": "integrated"', harness)
+        self.assertIn("bridge_tables_do_not_match_contract", harness)
+        self.assertIn("export_checksum_mismatch", harness)
+        self.assertNotIn('dbt("seed"', harness)
         for entity in ("customers", "products", "orders", "payments"):
             staging = (ROOT / "models" / "staging" / f"stg_{entity}.sql").read_text()
             self.assertIn("target.type != 'duckdb'", staging)

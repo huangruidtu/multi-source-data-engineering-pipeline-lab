@@ -151,3 +151,28 @@ a reviewed plan, export evidence, then seek separate approval for each exact
 destructive target. Never automatically delete S3/Iceberg data, KMS keys,
 Terraform state or evidence. Treat an existing OIDC provider as shared until
 ownership is proven.
+
+## AWS-07 integrated local demonstration
+
+On Linux with Java 17, Python 3.11, Python 3.12, `uv` 0.11.21 and the locked
+Spark and Gold environments installed, run:
+
+```bash
+uv run --project aws-native/spark --locked python aws-native/integration/run_demo.py --work-dir /tmp/mdep-aws07-demo
+```
+
+The work directory must not already exist. Inspect `aws07-evidence.json`,
+`aws07-gold-evidence.json`, both `exports/*/bridge-manifest.json` files, the
+DuckDB database and the Iceberg `warehouse/`. A successful local run is
+`LOCAL_END_TO_END_VERIFIED`; it does not authorize or prove AWS execution.
+
+An optional AWS smoke test requires a separate approval that names the exact
+sandbox account, region, data sources, bounded test records and maximum runtime.
+Before approval, review the Terraform plan and IAM diff; configure the protected
+GitHub environment and budget recipient; approve private networking, secrets and
+source access; explicitly opt in each required service; identify exact Bronze
+manifest keys; and agree on evidence capture and cleanup ownership. Capture S3
+objects and checksums, Glue/Iceberg snapshots, CloudWatch logs, dbt artifacts,
+Redshift results and reconciliation. Never infer approval for `terraform apply`,
+starting DMS, invoking Glue/Lambda, or enabling Redshift from a successful local
+demo. Disable producers first and use the existing reviewed cleanup procedure.

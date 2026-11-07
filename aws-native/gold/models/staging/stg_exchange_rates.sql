@@ -1,5 +1,5 @@
 with source_rows as (
-  {% if target.type == 'duckdb' %}
+  {% if target.type == 'duckdb' and env_var('MDEP_GOLD_INPUT_MODE', 'fixture') == 'fixture' %}
   select * from {{ ref('silver_bridge_exchange_rates') }}
   {% else %}
   select * from {{ source('silver_iceberg', 'ref_exchange_rates') }}
