@@ -3,17 +3,16 @@
 ## Result and evidence boundary
 
 GitHub Actions run
-[#42358301810](https://github.com/huangruidtu/multi-source-data-engineering-pipeline-lab/actions/runs/42358301810)
-completed successfully at commit `d10b874427a312279f1ed8300b3652474fd2f360`.
+[#42374809179](https://github.com/huangruidtu/multi-source-data-engineering-pipeline-lab/actions/runs/42374809179)
+completed successfully at commit `7d2dd85baecd2db0a0d8b10d42e8844885277332`.
 Its `integrated-local-demo` job established the observed PyArrow Parquet,
 manifest-v2, Spark 3.5.6/Iceberg 1.10.0, AWS-05 DMS/Iceberg and AWS-04
-dbt/DuckDB results below. The follow-up boundary correction routes those same
-deterministic reference inputs through the existing AWS-02 REST extractor and
-`IngestionPipeline` instead of constructing `SourceRecord` objects. An
-executable regression covers publication, manifest verification, identical
-replay and changed-content conflict through that path, and the PR requires the
-integrated job to rerun. The baseline run also passed offline validation, the
-independent real Spark/Iceberg suite and Gold/dbt validation.
+dbt/DuckDB results below. The deterministic reference inputs route through the
+existing AWS-02 REST extractor and `IngestionPipeline`; the emitted evidence
+labels the boundary `aws02_rest_extractor_and_ingestion_pipeline`. An executable
+regression also covers publication, manifest verification, identical replay and
+changed-content conflict through that path. The same run passed offline
+validation, the independent real Spark/Iceberg suite and Gold/dbt validation.
 
 This is `LOCAL_END_TO_END_VERIFIED`, not `AWS_RUNTIME_VERIFIED`. The HTTP
 transport is a deterministic in-process client; PostgreSQL, DMS, Kinesis, S3,
