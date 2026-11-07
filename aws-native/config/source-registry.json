@@ -1,0 +1,16 @@
+{
+  "registry_version": "mdep-source-registry-v1",
+  "sources": [
+    {
+      "source_id": "devices-json-reference",
+      "source_type": "json_file",
+      "source_entity": "devices",
+      "contract_version": "mdep-6-v1",
+      "local_path": "source-data/files/valid/device-reference.json",
+      "enabled": true,
+      "max_records": 100,
+      "owner": "MDEP data platform",
+      "description": "Bounded contract-backed device reference onboarding example"
+    }
+  ]
+}
