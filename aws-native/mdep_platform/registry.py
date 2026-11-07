@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,31 @@ SOURCE_COMBINATIONS = {
     "csv_file": frozenset({"product_categories"}),
     "rest_api": frozenset({"exchange_rates", "locations"}),
 }
+SAFE_REASON_TOKEN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+SAFE_OUTCOME_REASONS = frozenset({
+    "data_exists_with_different_source_content",
+    "data_write_not_visible",
+    "invalid_existing_data",
+    "invalid_existing_manifest",
+    "manifest_content_conflict",
+    "manifest_data_checksum_mismatch",
+    "manifest_exists_but_data_missing",
+    "manifest_record_count_mismatch",
+    "manifest_source_content_checksum_mismatch",
+    "reserved_envelope_field",
+    "source_content_conflict",
+})
+
+
+def _outcome_error_code(outcome: IngestionOutcome) -> str:
+    candidate = outcome.detail.partition(":")[0].strip()
+    if SAFE_REASON_TOKEN.fullmatch(candidate) and candidate in SAFE_OUTCOME_REASONS:
+        return candidate
+    if outcome.status == Status.CONFLICT:
+        return "publication_conflict"
+    if outcome.quarantine_key:
+        return "source_rejected"
+    return "publication_failed"
 
 
 class SourceRegistryError(ValueError):
@@ -216,7 +242,14 @@ class RegistryRunner:
             component="bronze_publisher", action="publish", source_id=source_id,
             source_entity=source.source_entity, run_identity=context.ingestion_id,
             status=status, record_count=outcome.record_count, duration_ms=publication_duration,
-            error_code=outcome.detail if outcome.status in {Status.CONFLICT, Status.FAILED} else None,
+            error_code=_outcome_error_code(outcome) if outcome.status in {Status.CONFLICT, Status.FAILED} else None,
             manifest_ref=outcome.manifest_key,
         )
+        if outcome.quarantine_key:
+            self.emitter.emit(
+                component="quarantine_publisher", action="quarantine", source_id=source_id,
+                source_entity=source.source_entity, run_identity=context.ingestion_id,
+                status="quarantined", rejected_count=1,
+                error_code=_outcome_error_code(outcome), manifest_ref=outcome.quarantine_key,
+            )
         return outcome

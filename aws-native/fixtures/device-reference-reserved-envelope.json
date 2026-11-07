@@ -1,0 +1,10 @@
+[
+  {
+    "device_id": "dev-reserved",
+    "location_id": "loc-100",
+    "device_type": "sensor",
+    "device_status": "active",
+    "updated_at": "2025-02-01T08:00:00Z",
+    "ingested_at": "source-must-not-control-this-envelope-field"
+  }
+]

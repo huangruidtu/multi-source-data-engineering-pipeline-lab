@@ -12,7 +12,7 @@ AWS_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = AWS_ROOT.parent
 sys.path.insert(0, str(AWS_ROOT))
 
-from mdep_ingestion.models import BatchContext, Status
+from mdep_ingestion.models import BatchContext, IngestionOutcome, Status
 from mdep_ingestion.object_store import LocalObjectStore, ObjectStoreFailure
 from mdep_ingestion.pipeline import IngestionPipeline
 from mdep_ingestion.publication import BronzePublisher, QuarantinePublisher
@@ -174,6 +174,69 @@ class PlatformIntegrationTests(unittest.TestCase):
         self.assertIn("conflict", conflict.detail)
         self.assertIn("quarantined", [event["status"] for event in self.sink.events])
         self.assertIn("conflicted", [event["status"] for event in self.sink.events])
+
+    def test_post_extraction_envelope_rejection_emits_safe_quarantine_event(self):
+        self.maxDiff = None
+        store = LocalObjectStore(self.root / "objects")
+        reserved_registry = self.registry_for_path(
+            "aws-native/fixtures/device-reference-reserved-envelope.json"
+        )
+
+        outcome = self.runner(store, reserved_registry).execute("devices-json-reference", context())
+
+        self.assertEqual(Status.FAILED, outcome.status)
+        self.assertIsNotNone(outcome.quarantine_key)
+        self.assertIsNotNone(store.head(str(outcome.quarantine_key)))
+        self.assertIsNone(store.head(context().manifest_key))
+        events = self.sink.events
+        serialized = "\n".join(self.sink.lines)
+        actual_contract = {
+            "statuses": [event["status"] for event in events],
+            "error_codes": [event["error_code"] for event in events if event["error_code"]],
+            "quarantine_refs": [
+                event["manifest_ref"] for event in events if event["status"] == "quarantined"
+            ],
+            "same_run_identity": all(event["run_identity"] == context().ingestion_id for event in events),
+            "unsafe_detail_present": "content_sha256" in serialized
+            or "source-must-not-control-this-envelope-field" in serialized,
+        }
+        self.assertEqual(
+            {
+                "statuses": ["completed", "failed", "quarantined"],
+                "error_codes": ["reserved_envelope_field", "reserved_envelope_field"],
+                "quarantine_refs": [outcome.quarantine_key],
+                "same_run_identity": True,
+                "unsafe_detail_present": False,
+            },
+            actual_contract,
+        )
+
+    def test_unexpected_failed_outcome_uses_a_safe_error_code_fallback(self):
+        class UnexpectedFailurePipeline:
+            @staticmethod
+            def complete(run_context, _extraction):
+                return IngestionOutcome(
+                    Status.FAILED,
+                    run_context.source_name,
+                    run_context.source_entity,
+                    run_context.ingestion_id,
+                    detail="customer_secret_token: https://unsafe.example/path payload=must-not-log",
+                )
+
+        runner = RegistryRunner(
+            self.registry,
+            UnexpectedFailurePipeline(),
+            self.emitter,
+            monotonic=lambda: 1.0,
+        )
+
+        outcome = runner.execute("devices-json-reference", context())
+
+        self.assertEqual(Status.FAILED, outcome.status)
+        self.assertEqual("publication_failed", self.sink.events[-1]["error_code"])
+        self.assertNotIn("customer_secret_token", "\n".join(self.sink.lines))
+        self.assertNotIn("https://", "\n".join(self.sink.lines))
+        self.assertNotIn("must-not-log", "\n".join(self.sink.lines))
 
     def test_interrupted_manifest_retry_recovers_same_identity_without_rewriting_data(self):
         class FailManifestOnce(LocalObjectStore):
