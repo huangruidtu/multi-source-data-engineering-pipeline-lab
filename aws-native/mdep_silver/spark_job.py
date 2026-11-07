@@ -244,7 +244,8 @@ def deduplicate(checked, entity: str):
     return winners, invalid.unionByName(duplicates, allowMissingColumns=True), duplicates.count()
 
 
-def _newer_sql(entity: str, source: str = "s", target: str = "t") -> str:
+def newer_than_sql(entity: str, source: str = "s", target: str = "t") -> str:
+    """Return the canonical AWS-03 freshness predicate for two Spark aliases."""
     version = "retrieved_at" if entity == "exchange_rates" else "updated_at"
     min_ts = "TIMESTAMP '1900-01-01 00:00:00'"
     s_extract = f"COALESCE({source}.source_extract_ts, {min_ts})"
@@ -264,7 +265,7 @@ def _merge_business(spark, winners, entity: str, table: str) -> tuple[int, int, 
     from pyspark.sql import functions as F
 
     missing = F.col(f"t.{keys[0]}").isNull()
-    newer = F.expr(_newer_sql(entity))
+    newer = F.expr(newer_than_sql(entity))
     counts = joined.select(
         F.when(missing, "insert").when(newer, "update").otherwise("unchanged").alias("outcome")
     ).groupBy("outcome").count().collect()
@@ -284,7 +285,7 @@ def _merge_business(spark, winners, entity: str, table: str) -> tuple[int, int, 
     insert_values = ", ".join(f"s.{column}" for column in columns)
     spark.sql(
         f"""MERGE INTO {table} t USING aws03_incoming s ON {key_sql}
-        WHEN MATCHED AND {_newer_sql(entity)} THEN UPDATE SET {update_sql}
+        WHEN MATCHED AND {newer_than_sql(entity)} THEN UPDATE SET {update_sql}
         WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})"""
     )
     return inserted, updated, unchanged

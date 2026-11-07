@@ -299,3 +299,64 @@ variable "enable_platform_observability" {
   type        = bool
   default     = false
 }
+
+variable "enable_emr_validation" {
+  description = "Create the optional read-only AWS-08 EMR Serverless validation application and runtime role; no job is submitted."
+  type        = bool
+  default     = false
+}
+
+variable "emr_validation_max_cpu" {
+  description = "Hard application CPU ceiling for the optional EMR Serverless validator."
+  type        = number
+  default     = 8
+
+  validation {
+    condition     = var.emr_validation_max_cpu == 8
+    error_message = "AWS-08 permits only the reviewed 8-vCPU application ceiling."
+  }
+}
+
+variable "emr_validation_max_memory_gb" {
+  description = "Hard application memory ceiling for the optional EMR Serverless validator."
+  type        = number
+  default     = 32
+
+  validation {
+    condition     = var.emr_validation_max_memory_gb == 32
+    error_message = "AWS-08 permits only the reviewed 32-GB application ceiling."
+  }
+}
+
+variable "emr_validation_idle_timeout_minutes" {
+  description = "Idle time before the optional EMR Serverless application stops."
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = var.emr_validation_idle_timeout_minutes >= 1 && var.emr_validation_idle_timeout_minutes <= 15
+    error_message = "AWS-08 idle auto-stop must remain between 1 and 15 minutes."
+  }
+}
+
+variable "emr_validation_job_timeout_minutes" {
+  description = "Required executionTimeoutMinutes for a manually approved AWS-08 batch job."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.emr_validation_job_timeout_minutes >= 10 && var.emr_validation_job_timeout_minutes <= 60
+    error_message = "AWS-08 batch validation must use a 10-60 minute execution timeout."
+  }
+}
+
+variable "emr_validation_retention_days" {
+  description = "Retention for optional validation reports, logs and their noncurrent versions."
+  type        = number
+  default     = 14
+
+  validation {
+    condition     = var.emr_validation_retention_days >= 7 && var.emr_validation_retention_days <= 30
+    error_message = "AWS-08 report/log retention must remain between 7 and 30 days."
+  }
+}
