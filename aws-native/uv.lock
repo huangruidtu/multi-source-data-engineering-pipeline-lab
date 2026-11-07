@@ -966,6 +966,7 @@ version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyarrow" },
 ]
@@ -978,6 +979,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.35,<2" },
+    { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pyarrow", specifier = ">=18,<23" },
 ]

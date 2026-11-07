@@ -3,7 +3,8 @@ import io
 import os
 import sys
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -42,17 +43,25 @@ class FakeS3:
 
 
 class FakePipeline:
-    def __init__(self, status=Status.PUBLISHED):
+    def __init__(self, status=Status.PUBLISHED, *, quarantine_key=None, detail=""):
         self.status = status
+        self.quarantine_key = quarantine_key
+        self.detail = detail
         self.calls = []
 
     def rest(self, context, **kwargs):
         self.calls.append(("rest", context, kwargs))
-        return IngestionOutcome(self.status, context.source_name, context.source_entity, context.ingestion_id, record_count=2)
+        return IngestionOutcome(
+            self.status, context.source_name, context.source_entity, context.ingestion_id,
+            record_count=2, quarantine_key=self.quarantine_key, detail=self.detail,
+        )
 
     def file_bytes(self, context, **kwargs):
         self.calls.append(("file", context, kwargs))
-        return IngestionOutcome(self.status, context.source_name, context.source_entity, context.ingestion_id, record_count=1)
+        return IngestionOutcome(
+            self.status, context.source_name, context.source_entity, context.ingestion_id,
+            record_count=1, quarantine_key=self.quarantine_key, detail=self.detail,
+        )
 
 
 class LambdaAdapterTests(unittest.TestCase):
@@ -73,10 +82,17 @@ class LambdaAdapterTests(unittest.TestCase):
         with lambda_environment(MDEP_REST_LOCATIONS_URL="https://example.test/locations"), patch.object(
             self.module.boto3, "client", return_value=fake_s3
         ), patch.object(self.module, "build_pipeline", return_value=pipeline):
-            result = self.module.handler(self.event, None)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                result = self.module.handler({**self.event, "source_id": "locations-primary"}, None)
         self.assertEqual("published", result["status"])
         self.assertEqual("https://example.test/locations", pipeline.calls[0][2]["url"])
         self.assertEqual("AWS_RUNTIME_DEFERRED", result["runtime_evidence"])
+        event = json.loads(output.getvalue())
+        self.assertEqual(("mdep-execution-event-v1", "locations-primary", "completed"), (
+            event["event_version"], event["source_id"], event["status"],
+        ))
+        self.assertNotIn("https://example.test", output.getvalue())
 
     def test_reference_file_requires_scoped_key_and_reads_same_bucket(self):
         pipeline = FakePipeline()
@@ -99,6 +115,26 @@ class LambdaAdapterTests(unittest.TestCase):
             self.module.boto3, "client", return_value=FakeS3()
         ), patch.object(self.module, "build_pipeline", return_value=pipeline), self.assertRaises(RuntimeError):
             self.module.handler(self.event, None)
+
+    def test_quarantine_emits_a_metric_filter_compatible_event_before_failure(self):
+        pipeline = FakePipeline(
+            Status.FAILED,
+            quarantine_key="quarantine/rest_api/locations/rejection.json",
+            detail="invalid_source_schema: https://example.test/locations#item=4",
+        )
+        with lambda_environment(MDEP_REST_LOCATIONS_URL="https://example.test/locations"), patch.object(
+            self.module.boto3, "client", return_value=FakeS3()
+        ), patch.object(self.module, "build_pipeline", return_value=pipeline), self.assertRaises(RuntimeError):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.module.handler(self.event, None)
+        events = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(["failed", "quarantined"], [event["status"] for event in events])
+        self.assertEqual("mdep-execution-event-v1", events[1]["event_version"])
+        self.assertEqual("quarantine_publisher", events[1]["component"])
+        self.assertEqual(1, events[1]["rejected_count"])
+        self.assertEqual("invalid_source_schema", events[1]["error_code"])
+        self.assertNotIn("https://", output.getvalue())
 
 
 if __name__ == "__main__":

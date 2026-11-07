@@ -1,0 +1,8 @@
+{
+  "create_github_oidc_provider": false,
+  "enable_ingestion_lambda": false,
+  "enable_glue_silver_job": false,
+  "enable_redshift_serverless": false,
+  "enable_dms_cdc": false,
+  "enable_platform_observability": false
+}

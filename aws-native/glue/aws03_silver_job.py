@@ -7,6 +7,7 @@ import argparse
 from mdep_ingestion.object_store import S3ObjectStore
 from mdep_silver.manifest import verify_committed_batch
 from mdep_silver.spark_job import process_verified_batch
+from mdep_platform.observability import JsonEventEmitter
 
 
 def arguments() -> argparse.Namespace:
@@ -27,14 +28,30 @@ def main() -> None:
     store = S3ObjectStore(args.data_bucket)
     spark = SparkSession.builder.appName("mdep-69-aws03-silver").getOrCreate()
     spark.conf.set("spark.sql.session.timeZone", "UTC")
+    emitter = JsonEventEmitter()
     for manifest_key in args.manifest_key:
-        verified = verify_committed_batch(store, manifest_key, max_payload_bytes=args.max_payload_bytes)
-        result = process_verified_batch(
-            spark,
-            verified,
-            f"s3://{args.data_bucket}/{verified.data_key}",
-            catalog=args.catalog,
-            namespace=args.namespace,
+        try:
+            verified = verify_committed_batch(store, manifest_key, max_payload_bytes=args.max_payload_bytes)
+            result = process_verified_batch(
+                spark,
+                verified,
+                f"s3://{args.data_bucket}/{verified.data_key}",
+                catalog=args.catalog,
+                namespace=args.namespace,
+            )
+        except Exception as error:
+            emitter.emit(
+                component="glue_silver_job", action="process_manifest", source_id="aws03-manifest",
+                source_entity="unknown", run_identity="unverified", status="failed",
+                error_code=type(error).__name__, manifest_ref=manifest_key,
+            )
+            raise
+        emitter.emit(
+            component="glue_silver_job", action="process_manifest", source_id=f"aws03-{verified.source_entity}",
+            source_entity=verified.source_entity, run_identity=verified.logical_run_identity,
+            status="noop" if result.inserted_count == 0 and result.updated_count == 0 else "completed",
+            record_count=result.input_count, rejected_count=result.rejected_count,
+            manifest_ref=manifest_key,
         )
         print(result.to_json())
     spark.stop()

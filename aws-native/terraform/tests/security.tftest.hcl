@@ -82,6 +82,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = length(aws_cloudwatch_log_metric_filter.platform_failed) == 0 && length(aws_cloudwatch_metric_alarm.platform_failed) == 0
+    error_message = "Platform custom metrics and alarms must be disabled by default."
+  }
+
+  assert {
     condition     = aws_budgets_budget.monthly.limit_amount == "25"
     error_message = "The default monthly budget must stay at USD 25."
   }
@@ -313,6 +318,52 @@ run "rejects_dms_cdc_without_budget_recipient" {
     cdc_postgres_secret_arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/cdc-postgres-AbCdEf"
     cdc_subnet_ids          = ["subnet-11111111", "subnet-22222222"]
     cdc_security_group_ids  = ["sg-11111111"]
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "bounded_platform_observability_on_existing_log_group" {
+  command = plan
+
+  variables {
+    allowed_account_ids           = ["123456789012"]
+    budget_alert_email            = "owner@example.com"
+    enable_ingestion_lambda       = true
+    enable_platform_observability = true
+    lambda_dependency_layer_arns  = ["arn:aws:lambda:eu-west-1:123456789012:layer:mdep-pyarrow-psycopg:1"]
+    postgres_secret_arn           = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/postgres-AbCdEf"
+    rest_exchange_rates_url       = "https://sources.example.test/exchange-rates"
+    rest_locations_url            = "https://sources.example.test/locations"
+  }
+
+  assert {
+    condition     = length(aws_cloudwatch_log_metric_filter.platform_failed) == 1 && length(aws_cloudwatch_log_metric_filter.platform_conflicted) == 1 && length(aws_cloudwatch_log_metric_filter.platform_quarantined) == 1
+    error_message = "The opt-in must create exactly three bounded filters on actual platform statuses."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_metric_filter.platform_failed[0].log_group_name == aws_cloudwatch_log_group.lambda[0].name && aws_cloudwatch_log_metric_filter.platform_failed[0].pattern == "{ $.event_version = \"mdep-execution-event-v1\" && $.status = \"failed\" }"
+    error_message = "Failure metrics must reuse the Lambda log group and match the emitted JSON contract exactly."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.platform_failed[0].treat_missing_data == "notBreaching" && aws_cloudwatch_metric_alarm.platform_failed[0].threshold == 0 && aws_cloudwatch_metric_alarm.platform_conflicted[0].treat_missing_data == "notBreaching"
+    error_message = "Missing execution events must not page and any observed failure/conflict must alarm."
+  }
+
+  assert {
+    condition     = output.platform_resource_summary.platform_observability == true && output.platform_resource_summary.ingestion_lambda == true
+    error_message = "The resource inventory must report enabled observability and its producer."
+  }
+}
+
+run "rejects_observability_without_producer_or_budget" {
+  command = plan
+
+  variables {
+    allowed_account_ids           = ["123456789012"]
+    enable_platform_observability = true
   }
 
   expect_failures = [terraform_data.guardrails]

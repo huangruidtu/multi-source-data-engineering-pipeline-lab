@@ -53,6 +53,21 @@ output "cdc_stream_arn" {
   value       = var.enable_dms_cdc ? aws_kinesis_stream.cdc[0].arn : null
 }
 
+output "platform_resource_summary" {
+  description = "Non-secret enablement inventory for dry-run review; values are configuration, not observed runtime or billing."
+  value = {
+    data_bucket                 = "managed"
+    kms_key                     = "managed"
+    budget                      = "managed"
+    ingestion_lambda            = var.enable_ingestion_lambda
+    glue_silver_job             = var.enable_glue_silver_job
+    redshift_serverless         = var.enable_redshift_serverless
+    dms_cdc                     = var.enable_dms_cdc
+    platform_observability      = local.platform_observability_enabled
+    github_oidc_provider_create = var.create_github_oidc_provider
+  }
+}
+
 output "evidence_status" {
   description = "Honest AWS-01 evidence boundary."
   value = {
@@ -64,6 +79,8 @@ output "evidence_status" {
     spark_iceberg    = "LOCAL_LINUX_CI_TESTED"
     dms_cdc_adapter  = "OFFLINE_TESTED"
     aws05_iceberg    = "LOCAL_LINUX_CI_TESTED"
+    source_registry  = "OFFLINE_TESTED"
+    observability    = "OFFLINE_TESTED"
     aws_runtime      = "RUNTIME_DEFERRED"
   }
 }
