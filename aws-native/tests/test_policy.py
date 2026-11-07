@@ -153,6 +153,31 @@ class AwsNativePolicyTests(unittest.TestCase):
         self.assertNotIn('actions   = ["glue:*"]', policy)
         self.assertNotIn('resources = ["*"]', policy)
 
+    def test_dms_cdc_is_real_payload_bounded_and_least_privilege(self):
+        cdc = (TF_ROOT / "cdc.tf").read_text(encoding="utf-8")
+        locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
+        for required in (
+            'message_format                 = "json-unformatted"',
+            "include_transaction_details    = true",
+            "partition_include_schema_table = true",
+            '"partition-key-type" = "primary-key"',
+            "BatchApplyEnabled            = false",
+            "ParallelApplyThreads         = 0",
+            'replication_instance_class  = "dms.t3.micro"',
+            "allocated_storage           = 20",
+            "publicly_accessible         = false",
+            "retention_period = 24",
+            'prefix              = "bronze/cdc/!{partitionKeyFromQuery:entity}',
+            'error_output_prefix = "bronze/cdc-errors/',
+            'compression_format  = "GZIP"',
+        ):
+            self.assertIn(required, cdc)
+        self.assertIn("!var.enable_dms_cdc || var.budget_alert_email != null", locals_text)
+        self.assertNotIn('actions   = ["kinesis:*"]', cdc)
+        self.assertNotIn('actions   = ["s3:*"]', cdc)
+        self.assertNotIn('resources = ["*"]', cdc)
+        self.assertIn('resources = ["${aws_s3_bucket.data.arn}/bronze/cdc/*", "${aws_s3_bucket.data.arn}/bronze/cdc-errors/*"]', cdc)
+
 
 if __name__ == "__main__":
     unittest.main()

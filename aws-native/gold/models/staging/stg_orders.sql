@@ -19,3 +19,6 @@ select
   cast(ingested_at as timestamp) as ingested_at,
   cast(record_hash as varchar) as record_hash
 from source_rows
+{% if target.type != 'duckdb' %}
+where not coalesce(is_deleted, false)
+{% endif %}

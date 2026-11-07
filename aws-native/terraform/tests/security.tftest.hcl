@@ -77,6 +77,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = length(aws_dms_replication_instance.cdc) == 0 && length(aws_kinesis_stream.cdc) == 0 && length(aws_kinesis_firehose_delivery_stream.cdc_archive) == 0
+    error_message = "All paid AWS-05 resources must be disabled by default."
+  }
+
+  assert {
     condition     = aws_budgets_budget.monthly.limit_amount == "25"
     error_message = "The default monthly budget must stay at USD 25."
   }
@@ -251,6 +256,63 @@ run "rejects_ingestion_lambda_without_budget_recipient" {
     postgres_secret_arn          = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/postgres-AbCdEf"
     rest_exchange_rates_url      = "https://sources.example.test/exchange-rates"
     rest_locations_url           = "https://sources.example.test/locations"
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "bounded_dms_cdc_when_explicitly_enabled" {
+  command = plan
+
+  variables {
+    allowed_account_ids     = ["123456789012"]
+    budget_alert_email      = "owner@example.com"
+    enable_dms_cdc          = true
+    cdc_postgres_secret_arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/cdc-postgres-AbCdEf"
+    cdc_subnet_ids          = ["subnet-11111111", "subnet-22222222"]
+    cdc_security_group_ids  = ["sg-11111111"]
+  }
+
+  assert {
+    condition     = aws_dms_replication_instance.cdc[0].replication_instance_class == "dms.t3.micro" && aws_dms_replication_instance.cdc[0].allocated_storage == 20 && aws_dms_replication_instance.cdc[0].multi_az == false && aws_dms_replication_instance.cdc[0].publicly_accessible == false
+    error_message = "The DMS instance must stay private and bounded to the reviewed interview size."
+  }
+
+  assert {
+    condition     = aws_kinesis_stream.cdc[0].shard_count == 1 && aws_kinesis_stream.cdc[0].retention_period == 24 && aws_kinesis_stream.cdc[0].encryption_type == "KMS"
+    error_message = "Kinesis must retain one encrypted shard for only 24 hours."
+  }
+
+  assert {
+    condition     = aws_dms_endpoint.kinesis[0].kinesis_settings[0].message_format == "json-unformatted" && aws_dms_endpoint.kinesis[0].kinesis_settings[0].include_transaction_details == true && aws_dms_endpoint.kinesis[0].kinesis_settings[0].partition_include_schema_table == true
+    error_message = "The target must emit real JSON_UNFORMATTED DMS events with transaction details."
+  }
+
+  assert {
+    condition     = jsondecode(aws_dms_replication_task.cdc[0].replication_task_settings).TargetMetadata.BatchApplyEnabled == false && jsondecode(aws_dms_replication_task.cdc[0].replication_task_settings).TargetMetadata.ParallelApplyThreads == 0
+    error_message = "DMS batch apply and parallel target apply must remain disabled."
+  }
+
+  assert {
+    condition     = strcontains(aws_kinesis_firehose_delivery_stream.cdc_archive[0].extended_s3_configuration[0].prefix, "bronze/cdc/!{partitionKeyFromQuery:entity}") && strcontains(aws_kinesis_firehose_delivery_stream.cdc_archive[0].extended_s3_configuration[0].error_output_prefix, "bronze/cdc-errors/")
+    error_message = "Firehose must separate per-entity raw CDC and explicit error prefixes."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.cdc_source_latency[0].threshold == 300 && aws_cloudwatch_metric_alarm.cdc_iterator_age[0].threshold == 300000 && aws_cloudwatch_metric_alarm.cdc_kinesis_throttles[0].threshold == 0
+    error_message = "CDC source lag, iterator age and write throttles must remain observable."
+  }
+}
+
+run "rejects_dms_cdc_without_budget_recipient" {
+  command = plan
+
+  variables {
+    allowed_account_ids     = ["123456789012"]
+    enable_dms_cdc          = true
+    cdc_postgres_secret_arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mdep/cdc-postgres-AbCdEf"
+    cdc_subnet_ids          = ["subnet-11111111", "subnet-22222222"]
+    cdc_security_group_ids  = ["sg-11111111"]
   }
 
   expect_failures = [terraform_data.guardrails]

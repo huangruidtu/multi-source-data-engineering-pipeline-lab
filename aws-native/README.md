@@ -165,3 +165,11 @@ changes alter the source-content checksum and remain conflicts.
 > concurrency, an eight-RPU Redshift ceiling and budget alerts control cost and
 > accidents. Terraform validation and mocked policy tests ran offline; no AWS
 > resource was deployed, so runtime remains explicitly deferred.
+
+AWS-05 adds a separate `mdep_cdc` package for the real AWS DMS Kinesis envelope,
+a persistent ordering oracle, a Spark/Iceberg v2 current-state writer, and an
+opt-in DMS/Kinesis/Firehose Terraform boundary. Firehose owns only the immutable
+newline-delimited S3 archive. The Iceberg writer owns `core_customers`,
+`core_products`, `core_orders`, and `core_payments`; deletes remain durable
+tombstones and Gold staging exposes only live rows. See `aws-05-interview.md`,
+`evidence-aws05.md`, and ADR-0003. No AWS-05 resource is deployed by CI.

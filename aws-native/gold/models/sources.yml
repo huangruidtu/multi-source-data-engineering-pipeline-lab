@@ -3,8 +3,8 @@ version: 2
 sources:
   - name: cdc_silver
     description: >-
-      FUTURE AWS-05 BOUNDARY. These current-state commerce tables do not exist in
-      AWS-04. The DuckDB target substitutes bounded fixture_* seeds explicitly.
+      AWS-05 Iceberg v2 current-state ledgers. Durable is_deleted tombstones are
+      filtered by staging; DuckDB substitutes bounded fixture_* seeds explicitly.
     schema: "{{ env_var('MDEP_CDC_SILVER_SCHEMA', 'silver_cdc') }}"
     tables:
       - name: core_customers

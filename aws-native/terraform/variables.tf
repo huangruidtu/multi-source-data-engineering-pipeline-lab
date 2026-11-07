@@ -240,3 +240,56 @@ variable "redshift_monthly_rpu_hours" {
     error_message = "The monthly Redshift limit must be a whole number from 8 through 40 RPU-hours."
   }
 }
+
+variable "enable_dms_cdc" {
+  description = "Explicit paid-resource switch for the AWS-05 DMS, Kinesis and Firehose CDC path."
+  type        = bool
+  default     = false
+}
+
+variable "cdc_postgres_secret_arn" {
+  description = "Exact Secrets Manager ARN containing the DMS PostgreSQL source connection."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.cdc_postgres_secret_arn == null || can(regex("^arn:[a-z0-9-]+:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$", var.cdc_postgres_secret_arn))
+    error_message = "cdc_postgres_secret_arn must be null or an exact Secrets Manager secret ARN."
+  }
+}
+
+variable "cdc_postgres_database_name" {
+  description = "PostgreSQL database exposed to the DMS source endpoint."
+  type        = string
+  default     = "mdep"
+
+  validation {
+    condition     = can(regex("^[A-Za-z][A-Za-z0-9_-]{0,62}$", var.cdc_postgres_database_name))
+    error_message = "cdc_postgres_database_name must be a conventional PostgreSQL database identifier."
+  }
+}
+
+variable "cdc_subnet_ids" {
+  description = "Reviewed private subnets in at least two availability zones for DMS."
+  type        = list(string)
+  default     = []
+}
+
+variable "cdc_security_group_ids" {
+  description = "Reviewed security groups allowing only the required DMS-to-PostgreSQL path."
+  type        = list(string)
+  default     = []
+}
+
+variable "cdc_secret_kms_key_arn" {
+  description = "Optional exact customer-managed KMS key ARN used by the PostgreSQL secret."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.cdc_secret_kms_key_arn == null || can(regex("^arn:[a-z0-9-]+:kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-f-]{36}$", var.cdc_secret_kms_key_arn))
+    error_message = "cdc_secret_kms_key_arn must be null or an exact KMS key ARN."
+  }
+}
