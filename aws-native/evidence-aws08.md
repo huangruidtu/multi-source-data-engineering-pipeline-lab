@@ -86,16 +86,49 @@ role boundaries: [Iceberg](https://docs.aws.amazon.com/emr/latest/EMR-Serverless
 
 ## Validation record
 
-Before the PR was opened, the preserved worktree passed:
+GitHub Actions run
+[#42401528252](https://github.com/huangruidtu/multi-source-data-engineering-pipeline-lab/actions/runs/42401528252)
+passed at commit `b6aafc2332b8dd66d06af274fb9ec4b86a89ea72`. Its Java 17
+`real-spark-iceberg` job executed four existing AWS-02/AWS-03/AWS-05 real
+Iceberg tests and then the new AWS-08 command. The command reported
+`LOCAL_SPARK_ICEBERG_VERIFIED`, `canonical_writer_unchanged=true` and
+`exact_replay_stable=true`.
+
+Observed reconciliation was:
+
+| Check | Initial | After newer rate |
+| --- | ---: | ---: |
+| Verified manifests | 2 | 2 |
+| Exchange-rate input/current keys | 1 / 1 | 1 / 1 |
+| Exchange-rate exact/superseded | 1 / 0 | 0 / 1 |
+| Location input/current keys | 1 / 1 | 1 / 1 |
+| Location exact/superseded | 1 / 0 | 1 / 0 |
+| Unrelated current keys | 0 | 0 |
+
+The initial Iceberg snapshot IDs were `8541346281469155116` for exchange rates
+and `5735442714004848603` for locations. Publishing the newer 7.60 rate through
+AWS-03 produced exchange-rate snapshot `2576763360621510994`; the unchanged
+location snapshot remained the same. The original historical manifest then
+reconciled as one strictly superseded rate, with no validator write.
+
+The same job observed all six expected failure tokens:
+
+- `historical_business_key_missing_from_current_silver`;
+- `duplicate_current_business_key`;
+- `invalid_current_reference_value_or_provenance`;
+- `duplicate_historical_business_key`;
+- `invalid_historical_reference_value`;
+- `manifest_unreadable_or_malformed`.
+
+The complete workflow also passed:
 
 - AWS-native offline Python tests: 79 passed, 1 Windows Airflow skip;
 - Terraform format, initialization, validation and 18 Terraform tests;
+- original MDEP V1 regressions: 62 passed;
+- real Spark/Iceberg regressions: 4 passed, followed by AWS-08 validation;
+- Gold contracts, Redshift parse and stateful dbt/DuckDB integration;
+- the AWS-07 real integrated local demo;
 - `git diff --check`.
-
-The PR’s final Linux run URL, exact observed reconciliation JSON, complete
-AWS-01 through AWS-07 regression results and final commit are recorded here
-after the remote run succeeds. This separation avoids presenting planned CI as
-executed evidence.
 
 ## Remaining limitations
 
