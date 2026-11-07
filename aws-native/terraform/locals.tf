@@ -68,5 +68,9 @@ resource "terraform_data" "guardrails" {
       condition     = !var.enable_dms_cdc || var.budget_alert_email != null
       error_message = "DMS CDC requires budget_alert_email before paid replication and streaming resources are enabled."
     }
+    precondition {
+      condition     = !var.enable_platform_observability || (var.enable_ingestion_lambda && var.budget_alert_email != null)
+      error_message = "Platform observability requires the existing ingestion Lambda log group and a budget alert recipient."
+    }
   }
 }

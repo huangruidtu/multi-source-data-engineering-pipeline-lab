@@ -14,6 +14,14 @@ data "archive_file" "lambda" {
       filename = "mdep_ingestion/${source.value}"
     }
   }
+
+  dynamic "source" {
+    for_each = fileset("${path.module}/../mdep_platform", "*.py")
+    content {
+      content  = file("${path.module}/../mdep_platform/${source.value}")
+      filename = "mdep_platform/${source.value}"
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {

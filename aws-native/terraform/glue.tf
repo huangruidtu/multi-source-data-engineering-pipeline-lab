@@ -17,6 +17,15 @@ data "archive_file" "glue_silver_package" {
       filename = "mdep_ingestion/${source.value}"
     }
   }
+
+
+  dynamic "source" {
+    for_each = fileset("${path.module}/../mdep_platform", "*.py")
+    content {
+      content  = file("${path.module}/../mdep_platform/${source.value}")
+      filename = "mdep_platform/${source.value}"
+    }
+  }
 }
 
 resource "aws_s3_object" "glue_silver_script" {

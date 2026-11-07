@@ -293,3 +293,9 @@ variable "cdc_secret_kms_key_arn" {
     error_message = "cdc_secret_kms_key_arn must be null or an exact KMS key ARN."
   }
 }
+
+variable "enable_platform_observability" {
+  description = "Create bounded metric filters and alarms for the structured platform events in the existing ingestion Lambda log group."
+  type        = bool
+  default     = false
+}

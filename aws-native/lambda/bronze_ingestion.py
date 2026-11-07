@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 import boto3
@@ -11,14 +12,21 @@ import boto3
 from mdep_ingestion.extractors import UrllibHttpClient
 from mdep_ingestion.models import BatchContext, Status
 from mdep_ingestion.runtime import build_pipeline, compact_or_raise
+from mdep_platform.observability import JsonEventEmitter
 
 
 POSTGRES_ENTITIES = frozenset({"customers", "products", "orders", "payments"})
+SAFE_ERROR_CODE = re.compile(r"^[a-z0-9_]{1,64}$")
 REST_ENV = {
     "exchange_rates": "MDEP_REST_EXCHANGE_RATES_URL",
     "locations": "MDEP_REST_LOCATIONS_URL",
 }
 FILE_ENTITIES = frozenset({"product_categories", "devices"})
+
+
+def _error_code(detail: str, fallback: str) -> str:
+    candidate = detail.partition(":")[0]
+    return candidate if SAFE_ERROR_CODE.fullmatch(candidate) else fallback
 
 
 def _required_environment(name: str) -> str:
@@ -119,6 +127,37 @@ def handler(event: dict[str, Any], _lambda_context: Any) -> dict[str, Any]:
             raise ValueError("source object exceeds MDEP_MAX_SOURCE_BYTES")
         outcome = pipeline.file_bytes(context, filename=source_key, content=content, max_records=max_records)
 
+    event_status = {
+        Status.PUBLISHED: "recovered" if outcome.detail == "recovered_matching_orphan_data" else "completed",
+        Status.ALREADY_PUBLISHED: "noop",
+        Status.CONFLICT: "conflicted",
+        Status.FAILED: "failed",
+    }[outcome.status]
+    emitter = JsonEventEmitter()
+    emitter.emit(
+        component="bronze_ingestion_lambda",
+        action="source_run",
+        source_id=str(event.get("source_id") or f"lambda-{source_type}-{entity}"),
+        source_entity=entity,
+        run_identity=context.ingestion_id,
+        status=event_status,
+        record_count=outcome.record_count,
+        rejected_count=1 if outcome.quarantine_key else 0,
+        error_code=_error_code(outcome.detail, f"publication_{outcome.status.value}") if outcome.status in {Status.FAILED, Status.CONFLICT} else None,
+        manifest_ref=outcome.manifest_key or outcome.quarantine_key,
+    )
+    if outcome.quarantine_key:
+        emitter.emit(
+            component="quarantine_publisher",
+            action="quarantine",
+            source_id=str(event.get("source_id") or f"lambda-{source_type}-{entity}"),
+            source_entity=entity,
+            run_identity=context.ingestion_id,
+            status="quarantined",
+            rejected_count=1,
+            error_code=_error_code(outcome.detail, "source_rejected"),
+            manifest_ref=outcome.quarantine_key,
+        )
     compact = compact_or_raise(outcome)
     compact["runtime_evidence"] = "AWS_RUNTIME_DEFERRED" if os.getenv("AWS_EXECUTION_ENV") is None else "AWS_EXECUTED"
     return compact

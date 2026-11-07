@@ -178,6 +178,20 @@ class AwsNativePolicyTests(unittest.TestCase):
         self.assertNotIn('resources = ["*"]', cdc)
         self.assertIn('resources = ["${aws_s3_bucket.data.arn}/bronze/cdc/*", "${aws_s3_bucket.data.arn}/bronze/cdc-errors/*"]', cdc)
 
+    def test_platform_observability_matches_events_without_iam_or_high_cardinality(self):
+        observability = (TF_ROOT / "observability.tf").read_text(encoding="utf-8")
+        identity = (TF_ROOT / "identity.tf").read_text(encoding="utf-8")
+        locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
+        for status in ("failed", "conflicted", "quarantined"):
+            self.assertIn(f'$.status = \\"{status}\\"', observability)
+        self.assertIn('event_version = \\"${local.platform_event_version}\\"', observability)
+        self.assertIn('log_group_name = aws_cloudwatch_log_group.lambda[0].name', observability)
+        self.assertIn('treat_missing_data  = "notBreaching"', observability)
+        self.assertNotIn("dimensions", observability)
+        self.assertNotIn("aws_iam_", observability)
+        self.assertNotIn("platform", identity.split('data "aws_iam_policy_document" "github_plan"', 1)[1].split('resource "aws_iam_role_policy" "github_plan"', 1)[0])
+        self.assertIn("!var.enable_platform_observability || (var.enable_ingestion_lambda && var.budget_alert_email != null)", locals_text)
+
 
 if __name__ == "__main__":
     unittest.main()

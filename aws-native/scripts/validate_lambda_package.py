@@ -19,6 +19,8 @@ REQUIRED = {
     "mdep_ingestion/publication.py",
     "mdep_ingestion/runtime.py",
     "mdep_ingestion/serialization.py",
+    "mdep_platform/__init__.py",
+    "mdep_platform/observability.py",
 }
 
 

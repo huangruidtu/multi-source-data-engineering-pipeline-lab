@@ -50,7 +50,12 @@ jobs:
       - name: Validate Lambda source package
         working-directory: .
         run: uv run --project aws-native --locked python aws-native/scripts/validate_lambda_package.py
-      - name: Run AWS-native ingestion, CDC state, Airflow parse and policy tests
+      - name: Run AWS-06 onboarding recovery and cleanup previews
+        working-directory: .
+        run: |
+          uv run --project aws-native --locked python aws-native/scripts/run_platform_demo.py
+          uv run --project aws-native --locked python aws-native/scripts/platform_inventory.py --config aws-native/config/sandbox-preview.json
+      - name: Run AWS-native registry, recovery, observability and pipeline tests
         working-directory: .
         run: uv run --project aws-native --locked python -m unittest discover -s aws-native/tests -v
       - name: Run original MDEP V1 regressions
