@@ -108,6 +108,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
       noncurrent_days = 30
     }
   }
+
+  rule {
+    id     = "expire-validation-reports-and-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "validation/"
+    }
+
+    expiration {
+      days = var.emr_validation_retention_days
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = var.emr_validation_retention_days
+    }
+  }
 }
 
 data "aws_iam_policy_document" "bucket" {

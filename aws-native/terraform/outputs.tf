@@ -64,6 +64,7 @@ output "platform_resource_summary" {
     redshift_serverless         = var.enable_redshift_serverless
     dms_cdc                     = var.enable_dms_cdc
     platform_observability      = local.platform_observability_enabled
+    emr_backfill_validation     = var.enable_emr_validation
     github_oidc_provider_create = var.create_github_oidc_provider
   }
 }
@@ -81,6 +82,21 @@ output "evidence_status" {
     aws05_iceberg    = "LOCAL_LINUX_CI_TESTED"
     source_registry  = "OFFLINE_TESTED"
     observability    = "OFFLINE_TESTED"
+    emr_validation   = "LOCAL_LINUX_CI_TESTED"
     aws_runtime      = "RUNTIME_DEFERRED"
   }
+}
+
+output "emr_validation_configuration" {
+  description = "Non-secret manual submission inputs; Terraform never starts a paid job."
+  value = var.enable_emr_validation ? {
+    application_id            = aws_emrserverless_application.validation[0].id
+    execution_role_arn        = aws_iam_role.emr_validation[0].arn
+    release_label             = aws_emrserverless_application.validation[0].release_label
+    script_uri                = "s3://${aws_s3_object.emr_validation_script[0].bucket}/${aws_s3_object.emr_validation_script[0].key}"
+    package_uri               = "s3://${aws_s3_object.emr_validation_package[0].bucket}/${aws_s3_object.emr_validation_package[0].key}"
+    report_prefix             = "s3://${aws_s3_bucket.data.id}/validation/reports/"
+    log_prefix                = "s3://${aws_s3_bucket.data.id}/validation/logs/"
+    execution_timeout_minutes = var.emr_validation_job_timeout_minutes
+  } : null
 }

@@ -87,6 +87,11 @@ run "secure_and_cost_bounded_defaults" {
   }
 
   assert {
+    condition     = length(aws_emrserverless_application.validation) == 0 && length(aws_iam_role.emr_validation) == 0
+    error_message = "The optional EMR validation application and role must be disabled by default."
+  }
+
+  assert {
     condition     = aws_budgets_budget.monthly.limit_amount == "25"
     error_message = "The default monthly budget must stay at USD 25."
   }
@@ -367,4 +372,61 @@ run "rejects_observability_without_producer_or_budget" {
   }
 
   expect_failures = [terraform_data.guardrails]
+}
+
+run "bounded_read_only_emr_validation_when_explicitly_enabled" {
+  command = plan
+
+  variables {
+    allowed_account_ids   = ["123456789012"]
+    budget_alert_email    = "owner@example.com"
+    enable_emr_validation = true
+  }
+
+  assert {
+    condition     = length(aws_emrserverless_application.validation) == 1 && length(aws_iam_role.emr_validation) == 1
+    error_message = "Explicit AWS-08 enablement must create one application and one runtime role."
+  }
+
+  assert {
+    condition     = aws_emrserverless_application.validation[0].release_label == "emr-7.12.0" && lower(aws_emrserverless_application.validation[0].type) == "spark"
+    error_message = "AWS-08 must stay pinned to the reviewed EMR 7.12.0 Spark baseline."
+  }
+
+  assert {
+    condition     = aws_emrserverless_application.validation[0].maximum_capacity[0].cpu == "8 vCPU" && aws_emrserverless_application.validation[0].maximum_capacity[0].memory == "32 GB"
+    error_message = "The optional application must retain its 8-vCPU and 32-GB ceilings."
+  }
+
+  assert {
+    condition     = aws_emrserverless_application.validation[0].auto_stop_configuration[0].enabled && aws_emrserverless_application.validation[0].auto_stop_configuration[0].idle_timeout_minutes == 5 && length(aws_emrserverless_application.validation[0].initial_capacity) == 0
+    error_message = "AWS-08 must auto-stop quickly and must not reserve pre-initialized capacity."
+  }
+
+  assert {
+    condition     = output.emr_validation_configuration.execution_timeout_minutes == 30 && output.platform_resource_summary.emr_backfill_validation == true
+    error_message = "Manual submission evidence must retain the bounded job timeout and inventory state."
+  }
+}
+
+run "rejects_emr_validation_without_budget_recipient" {
+  command = plan
+
+  variables {
+    allowed_account_ids   = ["123456789012"]
+    enable_emr_validation = true
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "rejects_oversized_emr_validation_capacity" {
+  command = plan
+
+  variables {
+    allowed_account_ids    = ["123456789012"]
+    emr_validation_max_cpu = 16
+  }
+
+  expect_failures = [var.emr_validation_max_cpu]
 }

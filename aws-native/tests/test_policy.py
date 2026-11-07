@@ -192,6 +192,31 @@ class AwsNativePolicyTests(unittest.TestCase):
         self.assertNotIn("platform", identity.split('data "aws_iam_policy_document" "github_plan"', 1)[1].split('resource "aws_iam_role_policy" "github_plan"', 1)[0])
         self.assertIn("!var.enable_platform_observability || (var.enable_ingestion_lambda && var.budget_alert_email != null)", locals_text)
 
+    def test_emr_validation_is_opt_in_read_only_and_cost_bounded(self):
+        emr = (TF_ROOT / "emr_validation.tf").read_text(encoding="utf-8")
+        locals_text = (TF_ROOT / "locals.tf").read_text(encoding="utf-8")
+        policy = emr.split('data "aws_iam_policy_document" "emr_validation"', 1)[1].split(
+            'resource "aws_iam_role_policy" "emr_validation"', 1
+        )[0]
+        self.assertIn('release_label = "emr-7.12.0"', emr)
+        self.assertIn('count = var.enable_emr_validation ? 1 : 0', emr)
+        self.assertIn('idle_timeout_minutes = var.emr_validation_idle_timeout_minutes', emr)
+        self.assertIn('cpu    = "${var.emr_validation_max_cpu} vCPU"', emr)
+        self.assertIn('memory = "${var.emr_validation_max_memory_gb} GB"', emr)
+        self.assertNotIn("initial_capacity {", emr)
+        self.assertIn("!var.enable_emr_validation || var.budget_alert_email != null", locals_text)
+        for read_prefix in ('/bronze/*"', '/iceberg/*"', '/scripts/aws08/*"'):
+            self.assertIn(read_prefix, policy)
+        for output_prefix in ('/validation/reports/*"', '/validation/logs/*"'):
+            self.assertIn(output_prefix, policy)
+        publish = policy.split('sid     = "PublishOnlyValidationReportsAndLogs"', 1)[1].split("  statement {", 1)[0]
+        self.assertNotIn('/bronze/*"', publish)
+        self.assertNotIn('/iceberg/*"', publish)
+        for forbidden in ('"s3:DeleteObject"', '"glue:CreateTable"', '"glue:UpdateTable"', '"glue:DeleteTable"', 'actions   = ["s3:*"]', 'actions   = ["glue:*"]'):
+            self.assertNotIn(forbidden, policy)
+        self.assertNotIn('resource "aws_emrserverless_job_run"', self.tf)
+
+
 
 if __name__ == "__main__":
     unittest.main()
