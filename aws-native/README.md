@@ -1,10 +1,11 @@
-# AWS-native MDEP (AWS-01 through AWS-03)
+# AWS-native MDEP (AWS-01 through AWS-07)
 
 This directory is the isolated AWS-native variant approved by
 [MDEP-66](https://ruiproject.atlassian.net/browse/MDEP-66) and
 [MDEP-67](https://ruiproject.atlassian.net/browse/MDEP-67) and
 [MDEP-68](https://ruiproject.atlassian.net/browse/MDEP-68) and
-[MDEP-69](https://ruiproject.atlassian.net/browse/MDEP-69). It does not change
+[MDEP-69](https://ruiproject.atlassian.net/browse/MDEP-69) through
+[MDEP-73](https://ruiproject.atlassian.net/browse/MDEP-73). It does not change
 the original MDEP V1 implementation or its runtime claims.
 
 ## Evidence status
@@ -23,7 +24,8 @@ the original MDEP V1 implementation or its runtime claims.
 | Redshift Serverless skeleton | CODED, opt-in | `enable_redshift_serverless=false` by default |
 | GitHub OIDC validation/plan workflow | CODED | `.github/workflows/aws-native-terraform.yml` |
 | Terraform format, validation and policy tests | OFFLINE TESTED | `scripts/validate.ps1`, `terraform/tests/`, `tests/` |
-| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01, AWS-02 or AWS-03 |
+| AWS-07 source-to-Gold integrated demo | LOCAL END-TO-END VERIFIED | `integration/run_demo.py`, `evidence-aws07.md`, Linux CI |
+| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 through AWS-07 |
 
 The captured local result is in `evidence.md`.
 
@@ -181,3 +183,18 @@ adding a Silver writer. `mdep-execution-event-v1` supplies safe JSON events;
 opt-in filters reuse the Lambda log group without widening IAM or OIDC. Run
 `scripts/run_platform_demo.py`; see `aws-06-interview.md`, `evidence-aws06.md`
 and ADR-0004.
+
+AWS-07 joins the implemented boundaries into a real local execution: the AWS-02
+REST extractor/pipeline publishes verified Bronze, AWS-03 and AWS-05 perform
+real Spark/Iceberg merges, and AWS-04 runs the actual incremental dbt project on
+the checksummed Silver export. The one-command demonstration is:
+
+```bash
+uv run --project aws-native/spark --locked python aws-native/integration/run_demo.py
+```
+
+Use `--work-dir /tmp/mdep-aws07-demo` with a new path to retain the evidence
+artifacts. See `evidence-aws07.md` for prerequisites, observed reconciliation,
+failure/recovery evidence, artifacts and runtime limitations; see
+`aws-07-interview.md` for the speakable explanation. This is local end-to-end
+evidence, not an AWS runtime claim.

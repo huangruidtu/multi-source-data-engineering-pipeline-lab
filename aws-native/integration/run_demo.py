@@ -21,10 +21,11 @@ sys.path.insert(0, str(AWS_ROOT))
 from mdep_cdc.dms_adapter import DmsAdapter
 from mdep_cdc.iceberg_writer import apply_iceberg_event, create_cdc_tables
 from mdep_cdc.models import ApplyDecision
-from mdep_ingestion.models import BatchContext, SourceRecord, enrich_record
+from mdep_ingestion.extractors import HttpResponse
+from mdep_ingestion.models import BatchContext
 from mdep_ingestion.object_store import LocalObjectStore
-from mdep_ingestion.publication import BronzePublisher
-from mdep_ingestion.serialization import to_parquet
+from mdep_ingestion.pipeline import IngestionPipeline
+from mdep_ingestion.publication import BronzePublisher, QuarantinePublisher
 from mdep_silver.manifest import ManifestValidationError, verify_committed_batch
 from mdep_silver.spark_job import build_local_spark, process_verified_batch
 
@@ -51,25 +52,47 @@ def _context(entity: str, day: int, hour: int) -> BatchContext:
     )
 
 
-def _source(payload: dict[str, Any], index: int) -> SourceRecord:
-    key = payload.get("location_id") or "|".join(
-        str(payload.get(name)) for name in ("rate_date", "base_currency", "quote_currency")
+class _FixtureHttpClient:
+    """Offline HTTP boundary that still exercises the production REST extractor."""
+
+    def __init__(self, payloads: list[dict[str, Any]]):
+        self.payloads = payloads
+        self.requests: list[str] = []
+
+    def get(self, url: str, *, timeout: float) -> HttpResponse:
+        del timeout
+        self.requests.append(url)
+        body = json.dumps({"items": self.payloads, "next_page": None}).encode("utf-8")
+        return HttpResponse(200, body, {"ETag": "aws07-offline-fixture-v1"})
+
+
+def _ingest(
+    store: LocalObjectStore,
+    entity: str,
+    day: int,
+    hour: int,
+    payloads: list[dict[str, Any]],
+):
+    context = _context(entity, day, hour)
+    client = _FixtureHttpClient(payloads)
+    pipeline = IngestionPipeline(BronzePublisher(store), QuarantinePublisher(store))
+    outcome = pipeline.rest(
+        context,
+        url=f"https://aws07-fixture.invalid/{entity}",
+        client=client,
+        max_pages=1,
+        max_records=100,
     )
-    extract = payload.get("updated_at") or payload.get("retrieved_at")
-    return SourceRecord(payload, key, str(extract), str(extract), f"aws07/page=1,row={index}")
-
-
-def _prepared(context: BatchContext, payloads: list[dict[str, Any]]):
-    rows = [enrich_record(_source(payload, index), context) for index, payload in enumerate(payloads, 1)]
-    return to_parquet(rows)
+    return outcome, client.requests
 
 
 def _publish(store: LocalObjectStore, entity: str, day: int, hour: int, payloads: list[dict[str, Any]]):
-    context = _context(entity, day, hour)
-    result = BronzePublisher(store).publish(context, _prepared(context, payloads))
+    result, requests = _ingest(store, entity, day, hour, payloads)
     if result.status.value != "published":
         raise AssertionError(f"bronze_publication_failed:{result}")
-    return result, verify_committed_batch(store, context.manifest_key)
+    if len(requests) != 1 or "page=1" not in requests[0]:
+        raise AssertionError(f"rest_extractor_request_contract_failed:{requests}")
+    return result, verify_committed_batch(store, str(result.manifest_key))
 
 
 def _dms_record(
@@ -173,14 +196,9 @@ def _run(work_root: Path) -> dict[str, Any]:
             "rate": "7.5000000000", "retrieved_at": "2026-11-01T06:00:00Z", "provider_name": "ECB",
         }
         rate_publication, rate_batch = _publish(store, "exchange_rates", 1, 8, [initial_rate, initial_rate])
-        rate_context = _context("exchange_rates", 1, 8)
-        bronze_replay = BronzePublisher(store).publish(
-            rate_context, _prepared(rate_context, [initial_rate, initial_rate])
-        )
+        bronze_replay, _ = _ingest(store, "exchange_rates", 1, 8, [initial_rate, initial_rate])
         conflicting_rate = {**initial_rate, "rate": "7.5500000000"}
-        bronze_conflict = BronzePublisher(store).publish(
-            rate_context, _prepared(rate_context, [conflicting_rate])
-        )
+        bronze_conflict, _ = _ingest(store, "exchange_rates", 1, 8, [conflicting_rate])
         if bronze_replay.status.value != "already_published" or bronze_conflict.status.value != "conflict":
             raise AssertionError("immutable_bronze_replay_contract_failed")
         rate_result = process_verified_batch(
@@ -282,6 +300,7 @@ def _run(work_root: Path) -> dict[str, Any]:
             except ManifestValidationError:
                 invalid_manifests += 1
         source_summary = {
+            "reference_source_boundary": "aws02_rest_extractor_and_ingestion_pipeline",
             "reference_input_rows": rate_result.input_count + location_result.input_count + corrected_result.input_count,
             "bronze_committed_manifests": valid_manifests,
             "invalid_manifest_artifacts": invalid_manifests,
