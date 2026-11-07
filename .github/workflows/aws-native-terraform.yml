@@ -84,6 +84,8 @@ jobs:
           uv sync --project aws-native/spark --locked --python 3.11
       - name: Run real AWS-02/AWS-03 and DMS CDC to Iceberg integrations
         run: uv run --project aws-native/spark --locked python -m unittest discover -s aws-native/spark/tests -v
+      - name: Run read-only historical backfill validation on real Iceberg
+        run: uv run --project aws-native/spark --locked python aws-native/integration/run_backfill_validation.py
 
   gold-dbt-validation:
     runs-on: ubuntu-latest
