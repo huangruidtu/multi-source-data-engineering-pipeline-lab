@@ -176,3 +176,50 @@ objects and checksums, Glue/Iceberg snapshots, CloudWatch logs, dbt artifacts,
 Redshift results and reconciliation. Never infer approval for `terraform apply`,
 starting DMS, invoking Glue/Lambda, or enabling Redshift from a successful local
 demo. Disable producers first and use the existing reviewed cleanup procedure.
+
+## AWS-08 read-only backfill validation
+
+On Linux with Java 17, Python 3.11, `uv` 0.11.21 and the locked Spark
+environment, run the exact CI demonstration:
+
+```bash
+uv run --project aws-native/spark --locked python aws-native/integration/run_backfill_validation.py
+```
+
+The command uses a temporary work directory and emits one final
+`AWS08_BACKFILL_VALIDATION_EVIDENCE=` JSON line. It requires network access only
+for the first Maven resolution of the pinned Iceberg runtime. No AWS credentials
+are needed. Native Windows Spark is not a supported evidence environment.
+
+An optional AWS run requires a separately approved Terraform plan and manual
+job submission. Keep `enable_emr_validation=false` until all of these gates are
+satisfied:
+
+1. Name the exact approved sandbox account and supported region; supply the one
+   approved account ID and budget-alert recipient.
+2. Review the application, runtime role and S3 objects in the no-refresh plan.
+   Do not run `terraform apply` as part of validation or CI.
+3. Confirm the AWS-03 tables already exist and are owned by its canonical
+   writer. AWS-08 must remain read-only.
+4. Review every explicit `_COMMITTED.json` key, the half-open UTC interval,
+   canonical validation UUID, catalog, namespace and report key. Do not replace
+   the manifest list with prefix discovery.
+5. Keep the 8-vCPU/32-GB maximum, one executor, one attempt, 30-minute timeout
+   and short auto-stop unless a new reviewed change narrows or justifies them.
+6. Use `emr/start-job-run.example.json` only after replacing every `REVIEWED_*`
+   placeholder. Submit it manually with the AWS CLI; Terraform intentionally
+   creates no job run.
+7. Capture the deterministic report under `validation/reports/`, EMR logs under
+   `validation/logs/`, the application/job IDs and current Iceberg snapshot IDs.
+   Stop the application and review retained evidence when the job completes.
+
+The execution role must never gain Glue mutation, S3 delete, Bronze write or
+Iceberg write permissions. The validator reports exact or strictly superseded
+historical keys and fails on missing, duplicate, invalid or conflicting state.
+Failure must not trigger repair. Any repair belongs to the AWS-03 writer and a
+separately reviewed replay.
+
+An approved smoke run may justify `AWS_RUNTIME_VERIFIED` only after its report,
+logs, IAM/KMS/S3 behavior and costs are reviewed. Until then, use
+`LOCAL_SPARK_ICEBERG_VERIFIED` for the Linux result and `AWS_RUNTIME_DEFERRED`
+for EMR.

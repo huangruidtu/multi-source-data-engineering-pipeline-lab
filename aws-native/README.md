@@ -1,11 +1,11 @@
-# AWS-native MDEP (AWS-01 through AWS-07)
+# AWS-native MDEP (AWS-01 through AWS-08)
 
 This directory is the isolated AWS-native variant approved by
 [MDEP-66](https://ruiproject.atlassian.net/browse/MDEP-66) and
 [MDEP-67](https://ruiproject.atlassian.net/browse/MDEP-67) and
 [MDEP-68](https://ruiproject.atlassian.net/browse/MDEP-68) and
 [MDEP-69](https://ruiproject.atlassian.net/browse/MDEP-69) through
-[MDEP-73](https://ruiproject.atlassian.net/browse/MDEP-73). It does not change
+[MDEP-74](https://ruiproject.atlassian.net/browse/MDEP-74). It does not change
 the original MDEP V1 implementation or its runtime claims.
 
 ## Evidence status
@@ -25,7 +25,9 @@ the original MDEP V1 implementation or its runtime claims.
 | GitHub OIDC validation/plan workflow | CODED | `.github/workflows/aws-native-terraform.yml` |
 | Terraform format, validation and policy tests | OFFLINE TESTED | `scripts/validate.ps1`, `terraform/tests/`, `tests/` |
 | AWS-07 source-to-Gold integrated demo | LOCAL END-TO-END VERIFIED | `integration/run_demo.py`, `evidence-aws07.md`, Linux CI |
-| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 through AWS-07 |
+| AWS-08 historical reference backfill validator | LOCAL LINUX SPARK/ICEBERG TESTED | `integration/run_backfill_validation.py`, `evidence-aws08.md`, Linux CI |
+| EMR Serverless 7.12 validation boundary | CODED, opt-in | `emr/`, `terraform/emr_validation.tf`; no job run is provisioned |
+| AWS service execution | RUNTIME DEFERRED | No resources were deployed for AWS-01 through AWS-08 |
 
 The captured local result is in `evidence.md`.
 
@@ -198,3 +200,17 @@ artifacts. See `evidence-aws07.md` for prerequisites, observed reconciliation,
 failure/recovery evidence, artifacts and runtime limitations; see
 `aws-07-interview.md` for the speakable explanation. This is local end-to-end
 evidence, not an AWS runtime claim.
+
+AWS-08 adds a read-only historical reference validator, not another Silver
+writer. Its mandatory Linux proof runs real AWS-02 Bronze publication, AWS-03
+Spark/Iceberg writes and independent current-state reconciliation:
+
+```bash
+uv run --project aws-native/spark --locked python aws-native/integration/run_backfill_validation.py
+```
+
+The optional EMR Serverless application is disabled by default, pins release
+7.12.0, has no pre-initialized capacity and creates no job run. See
+`evidence-aws08.md`, `aws-08-interview.md` and the AWS-08 section in
+`runbook.md`. Local Linux evidence does not prove Glue Catalog, S3FileIO, IAM,
+KMS or EMR runtime behavior.

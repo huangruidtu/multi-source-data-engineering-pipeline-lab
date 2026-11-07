@@ -173,3 +173,24 @@ and run identities, status, bounded counts/duration, safe error code, manifest
 reference and event time. Lambda/Glue stdout reaches their existing log groups.
 Optional Lambda filters create status-only custom metrics; AWS-05 service alarms
 remain separate and are not duplicated.
+
+## AWS-08 read-only historical validation
+
+AWS-08 is a consumer of two existing ownership boundaries, never a replacement
+writer. It accepts only explicit AWS-02 commit-manifest keys, reuses the
+manifest verifier and AWS-03 transformation/freshness expression, and reads the
+current `ref_exchange_rates` and `ref_locations` Iceberg tables. Its decision is
+`exact`, `superseded by strictly newer current state`, or fail closed.
+
+```text
+approved Bronze manifests ----> independent verification --+
+                                                           |
+AWS-03-owned Iceberg snapshots ----------------------------+--> report/log only
+                                                                  |
+                                              no MERGE / no Glue mutation
+```
+
+The optional EMR Serverless 7.12.0 application is an execution boundary only.
+It is absent by default and has a dedicated role that can read the relevant
+Bronze/Iceberg/code prefixes and two Glue tables, while writes are limited to
+`validation/reports/` and `validation/logs/`. Terraform never submits a job.
